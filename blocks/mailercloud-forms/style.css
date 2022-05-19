@@ -1,0 +1,29 @@
+/**
+ * The following styles get applied both on the front of your site and in the editor.
+ *
+ * Replace them with your own styles or remove the file completely.
+ */
+
+.wp-block-mailercloud-mc-forms {
+    background-color: #000;
+    color: #fff;
+    padding: 2px;
+}
+
+.mailercloud-block-container-component .css-7wrw87-Select.css-7wrw87-Select.css-7wrw87-Select {
+    height: 35px !important;
+    line-height: 35px !important;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.mailercloud-block-container-component .components-base-control__field {
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #000;
+}
+
+.mailercloud-block-container-component .components-base-control__field label {
+    margin-bottom: 16px !important;
+    font-weight: 600;
+}

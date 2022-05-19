@@ -1,0 +1,564 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+body {
+    font-family: 'Poppins', sans-serif;
+}
+
+.toplevel_page_mailercloud-settings-page div#wpcontent,
+.mailercloud_page_mailercloud-subscriber-synchronisation div#wpcontent {
+    background: #f3f3f3;
+}
+
+.mailercloud-wrap .success {
+    margin-bottom: 0;
+    margin-top: 15px;
+    font-size: 13px;
+    padding:10px 20px;
+    color: #0db175;
+    border: 1px solid #16DB93;
+    box-sizing: border-box;
+    margin: 5px 0;
+    width: 100%;
+    border-radius: 3px;
+    background: #f3fefa;
+	box-sizing: border-box;
+}
+.mailer_verify{padding-bottom: 65px;}
+.mailercloud-wrap .error {
+    color: red;
+    padding: 10px;
+    width: 100%;
+    color: red;
+    border: 1px solid red;
+    max-width: 100%;
+    box-sizing: border-box;
+    border-left: 3px solid red;
+    margin: 5px 0;
+}
+
+.mailcloud-ver h1,
+.subs-p h1,
+.sign-up_list h1 {
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    padding: 0 0 0 0;
+    margin-top: 20px;
+}
+div#mailercloud_apikey_section {
+	
+}
+
+
+.subs-p form {
+    background: #fff;
+    padding: 30px;
+    border-radius: 0;
+    box-shadow: 0px 0px 15px rgb(0 0 0 / 5%);
+    margin-bottom: 20px;
+	float: left;
+    width: 58% !important;
+    box-sizing: border-box;
+    /*border: 1px solid #09bafd;
+    border-left: 3px solid #09bafd;*/
+}
+
+div#mailercloud_apikey_section h2,
+div#mailercloud_my_account h2,
+.subs-p form h2,
+.sign-up_list-inner h2 {
+    font-size: 20px;
+    font-weight: 600;
+    padding: 0;
+    margin: 0 0 15px 0;
+}
+
+div#mailercloud_apikey_section form label,
+.subs-p form label {
+    font-size: 15px;
+    margin-right: 10px;
+    margin-bottom: 0;
+    line-height: 40px;
+}
+
+div#mailercloud_apikey_section form input,
+.subs-p form select {
+    width: 300px;
+    height: 40px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    text-transform: capitalize;
+}
+/**Added by Rajeev**/
+.mailer_fl_right a.button {
+    float: right;
+    width: auto;
+    background: #046DFF !important;
+    border: 1px solid #046DFF;
+    color: #fff !important;
+    font-size: 15px;
+    text-transform: capitalize;
+    padding: 3px 20px;
+    margin-bottom: 15px;
+    transition: all 0.5s ease;
+}
+
+.mailer_fl_right a.button:hover{
+    background: #0353a4 !important;
+    border: 1px solid #0353a4;
+    }
+
+.mailer_fl h2 {
+    float: left;
+}
+div#costs_main_new {
+    margin-top: 26px;
+}
+form#contact_sync_now_form {
+    float: right;
+    width: 40% !important;
+    margin: 0 10px;
+}
+.mailer_input {
+    margin-bottom: 10px;
+}
+div#mailercloud_my_account {margin-left:1%;}
+div#mailercloud_apikey_section, div#mailercloud_my_account {
+	float: left;
+    width: 49%;
+    background: #fff !important;
+    padding: 15px !important;
+    border-radius: 0 !important;
+    box-shadow: 0px 0px 15px rgb(0 0 0 / 5%) !important;
+    margin-bottom: 20px !important;
+    padding: 30px !important;
+	min-height: 380px;
+	box-sizing: border-box;
+}
+.mailer_account {
+    float: left;
+    width: 100%;
+}
+.mailer_logout {
+    float: right;
+}
+.mailer_logout input#logout_account {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid !important;
+    transition: all 0.5s ease;
+}
+.mailer_logout input#logout_account:hover{ background: #0353a4 !important;
+    border: 1px solid #0353a4; color: #fff !important;}
+
+h2.mailer_my_account {
+    float: left;
+    width: 30%;
+    padding-top: 11px !important;
+}
+
+div#mailercloud_apikey_section form input.button,
+.subs-p input.button {
+    width: auto;
+    background: #046DFF !important;
+    border: 1px solid #046DFF;
+    color: #fff !important;
+    font-size: 15px;
+    text-transform: capitalize;
+    padding: 3px 20px;
+    display: block;
+    margin-top: 15px;
+    transition: all 0.5s ease;
+}
+
+div#mailercloud_apikey_section form input.button:hover{background: #0353a4 !important;
+    border: 1px solid #0353a4;}
+
+.subs-p input.button:hover{background: #0353a4 !important;
+    border: 1px solid #0353a4;}
+
+input#logout_account {
+    width: auto;
+    background: #046DFF !important;
+    border: 1px solid #046DFF;
+    color: #fff !important;
+    font-size: 15px;
+    text-transform: capitalize;
+    padding: 3px 20px;
+    transition: all 0.5s ease;
+}
+input#logout_account:hover{background: #0353a4 !important;
+    border: 1px solid #0353a4;}
+
+div#mailercloud_my_account p {
+    font-size: 15px;
+    margin-bottom: 10px;
+}
+
+.subs-p form select {
+    margin-right: 10px;
+}
+.wp-core-ui select{ border-color: #ddd !important;}
+
+
+button.add_line {
+    border: 1px solid #16DB93;
+    width: 40px;
+    color: #16DB93;
+    background: transparent;
+    border-radius: 3px;
+    height: 40px;
+    margin-right: 0px;
+    cursor: pointer;
+    transition: all 0.5s ease;
+}
+button.add_line:hover{background: #16DB93 !important;
+    border: 1px solid #16DB93; color: #fff; }
+
+button.del_line {
+    border: 1px solid red;
+    width: 40px;
+    height: 40px;
+    color: red;
+    background: transparent;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.5s ease;
+}
+
+button.del_line:hover{background: red !important;
+    border: 1px solid red; color: #fff; }
+
+button.add_line_custom {
+    border: 1px solid #046DFF;
+    width: 40px;
+    color: #046DFF;
+    background: transparent;
+    border-radius: 3px;
+    height: 40px;
+    margin-right: 5px;
+    cursor: pointer;
+}
+
+button.del_line_custom {
+    border: 1px solid #046DFF;
+    width: 40px;
+    height: 40px;
+    color: #046DFF;
+    background: transparent;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+button,
+input,
+select,
+textarea {
+    box-sizing: border-box;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+}
+
+.input-group.repeat_div {
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+}
+
+div#costs_main {
+    margin-top: 20px;
+}
+
+.sign-up_list-inner {
+    background: #fff;
+    padding: 15px;
+   float:left;
+   max-width: 100% !important;
+   width: 100%; 
+   box-sizing: border-box;
+}
+
+.sign-up_list-inner table {
+    width: 100%;
+    border: 1px solid #ddd;
+    margin-top: 20px;
+    border-collapse: collapse;
+}
+
+.sign-up_list-inner table thead tr th,
+.sign-up_list-inner table tfoot tr th {
+    padding: 15px 10px;
+    font-size: 14px;
+	color:#8D9DAE !important;
+	background: #fff !important;
+    font-weight: 400;
+    text-align: left;
+}
+form#newPropertyForm label {
+    margin: 12px 0 7px 0px;
+    font-size: 14px;
+    display: inline-block;
+}
+form#newPropertyForm input.button {
+    background: #046DFF;
+    border-color: #046DFF;
+    color: #fff;
+    transition: all 0.5s ease;
+}
+form#newPropertyForm input.button:hover{background: #0353a4 !important;
+    border: 1px solid #0353a4; }
+
+.sign-up_list-inner table tbody tr td {
+    padding: 16px 10px;
+    text-align: left;
+    color: #000;
+}
+
+.sign-up_list-inner tbody tr {
+    border-bottom: 1px solid #ddd!important;
+}
+
+.sign-up_list-inner table thead,
+.sign-up_list-inner table tfoot {
+    background: #046DFF;
+    color: #fff;
+}
+
+.sign-up_list-inner tbody tr {
+    border-bottom: 1px solid #ddd!important;
+}
+
+.sign-up_list-inner tbody tr:nth-child(even) {
+    background: #f5f5f5;
+}
+
+.mailercloud_links {
+    margin-top: 10px;
+}
+
+select.mailercloud_attributes_custom.field_error {
+    border-color: red;
+}
+
+select.wordpress_attributes.field_error {
+    border-color: red;
+}
+
+select.mailercloud_attributes.field_error {
+    border-color: red;
+}
+
+
+/* The Modal (background) */
+
+.modal {
+    display: none;
+    /* Hidden by default */
+    position: fixed;
+    /* Stay in place */
+    z-index: 99999;
+    /* Sit on top */
+    left: 0;
+    top: 0;
+    width: 100%;
+    /* Full width */
+    height: 100%;
+    /* Full height */
+    overflow: auto;
+    /* Enable scroll if needed */
+    background-color: rgb(0, 0, 0);
+    /* Fallback color */
+    background-color: rgba(0, 0, 0, 0.4);
+    /* Black w/ opacity */
+    backdrop-filter: blur(4px);
+}
+
+form#newPropertyForm input {
+    width: 100%;
+    height: 40px;
+    border: 1px solid #ddd;
+}
+
+form#newPropertyForm select {
+    width: 100%;
+    max-width: 100%;
+    height: 40px;
+    margin: 0;
+}
+
+
+/* Modal Content/Box */
+
+.mailer_popup {
+    background-color: #fefefe;
+    margin: 15% auto;
+    /* 15% from the top and centered */
+    padding: 30px;
+    border: 1px solid #fff;
+    width: 30%;
+	box-sizing: border-box;
+    border-radius: 10px;
+    padding-bottom: 40px;
+	
+    /* Could be more or less, depending on screen size */
+}
+
+
+/* The Close Button */
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+div#sync_feedback p span {
+    display: inline-block;
+    width: 100%;
+	font-weight: 400;
+}
+div#sync_feedback {
+    margin-top: 20px;
+}
+div#sync_feedback p {
+    font-weight: 700;
+    font-size: 15px;
+}
+.costs_main .input-group.repeat_div .word_divs {
+    width: 46%;
+    margin-right: 1.5%;
+}
+.action_btns {
+    width: 5%;
+    text-align: right;
+}
+.costs_main .input-group.repeat_div .word_divs select {
+    width: 100%;
+    max-width: 100%;
+}
+
+.attribute_header label.wordpress_attributes {
+    width: 47% !important;
+    display: inline-block;
+    margin-right: 0px;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+
+.attribute_header label.mailercloud_attributes {
+    display: inline-block;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+.attribute_header label.mailercloud_attributes2 {
+    display: inline-block;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+.loader_mailercloud {
+    display: none;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    z-index: 999999;
+    right: 0;
+    bottom: 0;
+}
+
+.loader_mailercloud img {
+    margin: 0 auto;
+    text-align: center;
+    height: 80px;
+    width: 80px;
+    display: block;
+}
+
+.overlay-img {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+/* Turn off scrollbar when body element has the loading class */
+
+body.loading {
+    overflow: hidden;
+}
+
+
+/* Make spinner image visible when body element has the loading class */
+
+body.loading .loader_mailercloud {
+    display: block;
+}
+
+.total_contacts p {
+    padding: 10px;
+    width: 100%;
+    color: #008000;
+    border: 1px solid #008000;
+    max-width: 100%;
+    box-sizing: border-box;
+    border-left: 3px solid #008000;
+    margin: 5px 0;
+}
+
+.total_contacts {
+    margin-top: 20px;
+}
+
+button#new_property {
+    width: 100%;
+    background: #fff !important;
+    border: 1px dotted #16DB93;
+    color: #16DB93!important;
+    font-size: 13px;
+    text-transform: capitalize;
+    padding: 10px 20px;
+    border-radius: 3px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.5s ease;
+}
+button#new_property:hover{background: #16DB93 !important;
+    border: 1px dotted #16DB93; color: #fff !important;}
+
+#wpfooter {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: auto;
+    padding: 10px 20px;
+    color: #50575e;
+    top: auto;
+    background: #f3f3f3;
+}
+.mailer_input input {
+    width: 100% !important;
+}
+.mailercloud_links a {
+    color: #091929;
+    transition: all 0.5s ease;
+}
+.mailercloud_links a:hover{ color: #046DFF;}
+
+
+.mailer_popup h2 {
+    font-size: 22px;
+    margin-top: 15px;
+}
