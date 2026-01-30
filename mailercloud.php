@@ -7,7 +7,7 @@
  * Author URI:      https://mailercloud.com/
  * Text Domain:     mailercloud
  * Domain Path:     /languages
- * Version:         1.0
+ * Version:         1.0.7
  *
  * @package         Mailercloud
  */
@@ -23,7 +23,7 @@ class Mailercloud
      * @since 0.1.0
      * @var
      */
-    public $version = '1.0';
+    public $version = '1.0.7';
     /* Member variables */
     public $mailercloud_api_key;
     public $default_mapping_array= [];
@@ -367,7 +367,6 @@ class Mailercloud
                     if ($api_key) {
                         $file = $this->mailercloud_get_plugin_path() . '/assets/json_files/attribute_mapping.json';
                         $attribute_mapping_arr = json_decode(file_get_contents($file), true);
-                        $contacts = [];
                         if (!empty($attribute_mapping_arr)) {
                             $temp = [];
                             $temp_final = [];
@@ -391,11 +390,13 @@ class Mailercloud
                                 $temp_custom =[];
                                 foreach ($attribute_mapping_arr as $row) {
                                     $find="custom_fields_";
-                                    if (strpos($row['mailercloud_attribute'], $find) !== false) {
+                                    if ($row['wordpress_attribute'] == 'tags') {
+                                        $temp['tags'] = json_decode($row['mailercloud_attribute'],true);
+                                    } else if (strpos($row['mailercloud_attribute'], $find) !== false) {
                                         $mailercloud_attribute_key = str_replace($find, '', $row['mailercloud_attribute']);
                                         $temp_custom[$mailercloud_attribute_key] = $user[$row['wordpress_attribute']];
                                     } else {
-                                        $temp[$row['mailercloud_attribute']] =$user[$row['wordpress_attribute']] ;
+                                        $temp[$row['mailercloud_attribute']] =$user[$row['wordpress_attribute']];
                                     }
                                 }
                                 if (!empty($temp_custom)) {
@@ -548,7 +549,9 @@ class Mailercloud
                         $temp_custom =[];
                         foreach ($attribute_mapping_arr as $row) {
                             $find="custom_fields_";
-                            if (strpos($row['mailercloud_attribute'], $find) !== false) {
+                            if ($row['wordpress_attribute'] == 'tags') {
+                                $temp['tags'] = json_decode($row['mailercloud_attribute'],true);
+                            } elseif (strpos($row['mailercloud_attribute'], $find) !== false) {
                                 $mailercloud_attribute_key = str_replace($find, '', $row['mailercloud_attribute']);
                                 $temp_custom[$mailercloud_attribute_key] = $user[$row['wordpress_attribute']];
                             } else {
@@ -621,7 +624,9 @@ class Mailercloud
                         $temp_custom =[];
                         foreach ($attribute_mapping_arr as $row) {
                             $find="custom_fields_";
-                            if (strpos($row['mailercloud_attribute'], $find) !== false) {
+                            if ($row['wordpress_attribute'] == 'tags') {
+                                $temp['tags'] =  json_decode($row['mailercloud_attribute'],true);
+                            } elseif (strpos($row['mailercloud_attribute'], $find) !== false) {
                                 $mailercloud_attribute_key = str_replace($find, '', $row['mailercloud_attribute']);
                                 $temp_custom[$mailercloud_attribute_key] = $user[$row['wordpress_attribute']];
                             } else {
@@ -696,7 +701,9 @@ class Mailercloud
                             $temp_custom =[];
                             foreach ($attribute_mapping_arr as $row) {
                                 $find="custom_fields_";
-                                if (strpos($row['mailercloud_attribute'], $find) !== false) {
+                                if ($row['wordpress_attribute'] == 'tags') {
+                                    $temp['tags'] =  json_decode($row['mailercloud_attribute'],true);
+                                } elseif (strpos($row['mailercloud_attribute'], $find) !== false) {
                                     $mailercloud_attribute_key = str_replace($find, '', $row['mailercloud_attribute']);
                                     $temp_custom[$mailercloud_attribute_key] = $user[$row['wordpress_attribute']];
                                 } else {
@@ -830,6 +837,7 @@ class Mailercloud
         $users=[];
         $user_data = [];
         $contact_data = [];
+        $tagsData = [];
         $lists = [];
         $list_id ='';
         $errors= [];
@@ -846,7 +854,7 @@ class Mailercloud
         $selected_mailercloud_attributes = [];
         $selected_list_name = '';
         $mailercloud_attributes_properties =[];
-       
+        $mailercloud_tags =[];
         $attribute_mapping_arr=[];
         $mailercloud_attributes = array(
             'email' => 'Email',
@@ -936,6 +944,27 @@ class Mailercloud
                 }
             } else {
             }
+            $tag_data = array(
+                'limit' => 100,
+                'page' => 1,
+                'search' => '',
+            );
+            $tag_response= callWpRemoteRestApi(
+                'POST',
+                MAILERCLOUD_TAG_LISTING_API_URL,
+                $api_key,
+                json_encode($tag_data)
+            );
+            if (isset($tag_response['data'])) {
+                $listing = $tag_response['data'];
+                foreach ($listing as $list) {
+                    
+                    $key ="tags_".$list['id'];
+                    $mailercloud_tags[$key] = $list['tag_name'];
+                }
+                
+            } else {
+            }
         }
         
         if (get_option('mailercloud_selected_sync_list')) {
@@ -963,6 +992,7 @@ class Mailercloud
                 if (isset($_POST['list_id']) && !empty($_POST['list_id'])) {
                     $selected_wordpress_attributes = sanitize_text_field($_POST['mailercloud_attributes']);
                     $selected_mailercloud_attributes = sanitize_text_field($_POST['mailercloud_attributes']);
+                    $tagsData = isset($_POST['mailercloud_tags']) ? sanitize_text_field($_POST['mailercloud_tags']) : [];
                     $selected_list_name = sanitize_text_field($_POST['selected_list_name']);
                     update_option('mailercloud_selected_sync_list_id', sanitize_text_field($_POST['list_id']));
                     update_option('mailercloud_selected_sync_list', trim($selected_list_name));
@@ -970,22 +1000,34 @@ class Mailercloud
                     {
                         foreach ($_POST['mailercloud_attributes'] as $key => $attr) {
                             $mailercloud_attribute = sanitize_text_field($_POST['mailercloud_attributes'][$key]);
-                            $wordpress_attribute =sanitize_text_field($_POST['wordpress_attributes'][$key]);
+                            $wordpress_attribute = sanitize_text_field($_POST['wordpress_attributes'][$key]);
                             $attribute_mapping_arr[] = array(
                                 'wordpress_attribute' => $wordpress_attribute,
                                 'mailercloud_attribute' => $mailercloud_attribute,
                                 'is_custom_fields' => 0,
                             );
                         }
+
+                        if (isset($_POST['mailercloud_tags']) && is_array($_POST['mailercloud_tags'])) {
+                            $tag_attribute = [];
+                            foreach ($_POST['mailercloud_tags'] as $key => $name) {
+                                $tag_attribute[] = stripslashes($name);
+                            }
+                            $attribute_mapping_arr[] = array(
+                                'wordpress_attribute' => 'tags',
+                                'mailercloud_attribute' => json_encode($tag_attribute),
+                            );
+                        }
+
                         if (!empty($attribute_mapping_arr)) {
                             $file = $this->mailercloud_get_plugin_path() . '/assets/json_files/attribute_mapping.json';
                             if (is_writable($file)) {
                                 if (file_put_contents($file, json_encode($attribute_mapping_arr))) {
                                     $jsonData = json_decode(file_get_contents($file), true);
-                                    $message2 = 'Attribute mapping is saved successfully.';
+                                    $message2 = 'Tag saved successfully.';
                                     $msg2 = true;
                                 } else {
-                                    $message2 = 'Attribute mapping is not saved';
+                                    $message2 = 'Tag is not saved';
                                     $msg2= false;
                                 }
                             } else {

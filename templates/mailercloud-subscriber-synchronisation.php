@@ -50,6 +50,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
             <?php  foreach ($jsonData as $id => $row) : ?>
 
+            <?php if($row['wordpress_attribute'] != "tags" ): ?>
+
             <?php if(!($row['is_custom_fields'])) : $j++;  ?>
 
 
@@ -100,7 +102,9 @@ if ( ! defined( 'ABSPATH' ) ) {
             </div>
 
             <?php endif; ?>
-
+            <?php else : ?>
+            <?php $tagsData = json_decode($row['mailercloud_attribute'], true) ?? []; ?>
+            <?php endif; ?> 
             <?php  endforeach; ?>
             <?php else : ?>
 
@@ -137,11 +141,48 @@ if ( ! defined( 'ABSPATH' ) ) {
                     </div>
                 </div>
             </div>
-
-
-
-
             <?php endif; ?>
+            
+
+<!----------------->
+
+    <!---Tags--->
+    
+        
+        
+            <div class="mc-dropdown">
+                <a onclick="toggleDropdown()" class="mc-dropdown-btn">Choose Tags</a>
+                <span></span>
+                <div id="myDropdown" class="dropdown-content">
+                    <?php
+                    foreach ($mailercloud_tags as $name) {
+                        ?>
+                        <label>
+                            <input type="checkbox" name="mailercloud_tags[]" value="<?php echo esc_attr($name); ?>" 
+                            <?php if (in_array($name, $tagsData)) echo 'checked="checked"'; ?>> 
+                            <?php echo esc_html($name); ?>
+                        </label>
+                        <?php
+                    }
+                    ?>
+                </div>
+            </div>
+            <div class="selected-options">
+                <span id="selected-list">
+                    <?php
+                    foreach ($tagsData as $name) {
+                        ?>
+                        <span><?php echo esc_html($name); ?></span>
+                        <?php
+                    }
+                    ?>
+                </span>
+            </div>
+            
+
+                
+<!------------------>
+
             <button type="button" id="new_property">Create new property</button>
         </div>
         <?php  if ($message2) : ?>
@@ -254,3 +295,33 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 
 </div>
+
+<script>
+    function toggleDropdown() {
+      document.getElementById("myDropdown").style.display = 
+        document.getElementById("myDropdown").style.display === "block" ? "none" : "block";
+    }
+
+    document.addEventListener('click', function(event) {
+      if (!event.target.matches('.mc-dropdown-btn') && !event.target.closest('.dropdown-content')) {
+        document.getElementById("myDropdown").style.display = "none";
+      }
+    });
+
+    const checkboxes = document.querySelectorAll('input[type=checkbox]');
+    checkboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', updateSelectedOptions);
+    });
+
+    function updateSelectedOptions() {
+      const selectedList = document.getElementById('selected-list');
+      selectedList.innerHTML = '';
+      checkboxes.forEach(checkbox => {
+        if (checkbox.checked) {
+          const span = document.createElement('span');
+          span.textContent = checkbox.value;
+          selectedList.appendChild(span);
+        }
+      });
+    }
+  </script>

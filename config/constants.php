@@ -17,5 +17,6 @@ define("MAILERCLOUD_SUBSCRIBER_SYNC_SINGLE_CONTACT_API_URL", "https://cloudapi.m
 define("MAILERCLOUD_SIGNUP_FORM_LISTING_API_URL", "https://cloudapi.mailercloud.com/v1/webform/search");
 
 define("MAILERCLOUD_TICKET_CREATION_API_URL", "https://cloudapi.mailercloud.com/v1/ticket");
+define("MAILERCLOUD_TAG_LISTING_API_URL", "https://cloudapi.mailercloud.com/v1/tags/search");
 
 ?>

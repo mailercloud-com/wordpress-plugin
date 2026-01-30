@@ -49,6 +49,49 @@
         }
         if (is_array($response) && is_wp_error($response)) {
             $message = __('Sorry We are not Verify APi Key, Please try again.', 'mailercloud');
+        } elseif (is_wp_error($response)) {
+            echo '<br><div style="color: #a94442;
+                background-color: #f2dede;
+                border-color: #ebccd1;
+                padding: 15px;
+                margin-bottom: 20px;
+                border: 1px solid transparent;
+                border-radius: 4px;
+                float:left;
+                width: 100%">Sync Error : Your Mailercloud data will not load</div>';
+            $errors = "response not loaded issue";
+            $descriptionArray =[
+            	'method' => $method,
+            	'request' =>$body,
+            	'response' => $response,
+            ];
+            /** ticket creation api **/
+            $title = 'Api url :'.$url;
+            $dataTicket = [
+            	'title' 	   => $title,
+            	'description'  => json_encode($descriptionArray),
+                'status' => 500,
+            ];
+                       
+            $optionsTicket = [
+            	'body'        => json_encode($dataTicket),
+            	'headers'     => [
+                	'Content-Type' => 'application/json',
+            	    'Authorization' => $api_key
+            	],
+            	'data_format' => 'body',
+            ];
+            $responseTicket = wp_remote_post(MAILERCLOUD_TICKET_CREATION_API_URL, $optionsTicket);
+            if (is_array($responseTicket) && is_wp_error($responseTicket)) {
+                $message = __('Sorry error occured, Please try again.', 'mailercloud');
+            }
+            /** end of ticket creation api **/
+            $response =[
+                'message' => $message,
+                'status' => $status,
+                'errors' => $errors
+            ];
+            return $response;
         } else {
             $bodyData = json_decode($response['body'], true);
             if (!isset($bodyData['data'])) {
@@ -128,7 +171,7 @@
     function get_users_by_role($role, $orderby, $order)
     {
         $args = array(
-            'role__in'     => array('administrator', 'editor', 'author','subscriber'),
+            //'role__in'     => array('administrator', 'editor', 'author','subscriber'),
             'orderby' => $orderby,
             'order' => $order
         );
