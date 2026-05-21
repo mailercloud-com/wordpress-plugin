@@ -54,8 +54,7 @@
                 const forms = [];
                 const results = await wp.apiFetch({
                     path: '/mailcloud/v1/get-signup-forms',
-                    method: 'POST',
-                    data: { username: 'admin', password: 'dkgklf2dasg$lkf8gldfs@HGvkdfsk#' }
+                    method: 'POST'
                 }).then((results) => {
                     results.webforms.forEach((post) => {
                         forms.push({

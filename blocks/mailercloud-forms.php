@@ -160,7 +160,9 @@ function mailercloud_render_dynamic_block($attributes)
             array(
         'methods' => 'POST',
         'callback' => 'mailcloud_rest_api_get_signup_forms',
-        'permission_callback' => '__return_true',
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        },
     )
         );
     }
@@ -175,8 +177,6 @@ function mailercloud_render_dynamic_block($attributes)
 function mailcloud_rest_api_get_signup_forms($request)
 {
     $response = [];
-    $parameters = $request->get_json_params();
-    $response['parameters'] = $parameters;
     $webforms = [];
     
     if (get_option('mailercloud_api_key')) {

@@ -7,7 +7,7 @@
  * Author URI:      https://mailercloud.com/
  * Text Domain:     mailercloud
  * Domain Path:     /languages
- * Version:         1.0.7
+ * Version:         1.0.8
  *
  * @package         Mailercloud
  */
@@ -23,7 +23,7 @@ class Mailercloud
      * @since 0.1.0
      * @var
      */
-    public $version = '1.0.7';
+    public $version = '1.0.8';
     /* Member variables */
     public $mailercloud_api_key;
     public $default_mapping_array= [];
@@ -87,18 +87,9 @@ class Mailercloud
             "wp_ajax_mailercloud_create_new_property",
             array($this, "mailercloud_create_new_property")
         );
-        add_action(
-            "wp_ajax_nopriv_mailercloud_create_new_property",
-            array($this, "mailercloud_create_new_property")
-        );
-       
 
         add_action(
             "wp_ajax_mailercloud_sync_contacts_now_ajax",
-            array($this, "mailercloud_sync_contacts_now_ajax")
-        );
-        add_action(
-            "wp_ajax_nopriv_mailercloud_sync_contacts_now_ajax",
             array($this, "mailercloud_sync_contacts_now_ajax")
         );
     }
@@ -301,6 +292,10 @@ class Mailercloud
 
     public function mailercloud_create_new_property()
     {
+        check_ajax_referer('mailercloud_admin_ajax', '_ajax_nonce');
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'forbidden'), 403);
+        }
         $response =[];
         if (isset($_POST['name'])) {
             if (get_option('mailercloud_api_key')) {
@@ -332,6 +327,10 @@ class Mailercloud
 
     public function mailercloud_sync_contacts_now_ajax()
     {
+        check_ajax_referer('mailercloud_admin_ajax', '_ajax_nonce');
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'forbidden'), 403);
+        }
         $users =[];
         $response =[];
         $list_id ='';
@@ -761,7 +760,7 @@ class Mailercloud
         $user_data = [];
         if (isset($_POST['mc_account_logout'])) {
             $mc_api_logout_nonce = (isset($_POST['mc_api_logout_nonce'])) ? sanitize_text_field($_POST['mc_api_logout_nonce']) : null;
-            if (wp_verify_nonce($mc_api_logout_nonce, 'mc_api_logout')) {
+            if (wp_verify_nonce($mc_api_logout_nonce, 'mc_api_logout') && current_user_can('manage_options')) {
                 if (isset($_POST['mc_account_logout']) && !empty($_POST['mc_account_logout'])) {
                     update_option('mailercloud_api_key', '');
                     update_option('mailercloud_selected_sync_list_id', '');
@@ -774,7 +773,7 @@ class Mailercloud
 
         if (isset($_POST['apikey_verify'])) {
             $nonce = (isset($_POST['mc_api_key_nonce'])) ? sanitize_text_field($_POST['mc_api_key_nonce']) : null;
-            if (wp_verify_nonce($nonce, 'mc_api_key')) {
+            if (wp_verify_nonce($nonce, 'mc_api_key') && current_user_can('manage_options')) {
                 if (isset($_POST['mc_api_key']) && !empty($_POST['mc_api_key'])) {
                     $api_key = sanitize_text_field($_POST['mc_api_key']);
                     $this->mailercloud_api_key = $api_key;
@@ -988,7 +987,7 @@ class Mailercloud
         
         if (isset($_POST['apikey_sync_list'])) {
             $nonce = (isset($_POST['mc_sync_list_key'])) ? sanitize_text_field($_POST['mc_sync_list_key']) : null;
-            if (wp_verify_nonce($nonce, 'mc_sync_list_key')) {
+            if (wp_verify_nonce($nonce, 'mc_sync_list_key') && current_user_can('manage_options')) {
                 if (isset($_POST['list_id']) && !empty($_POST['list_id'])) {
                     $selected_wordpress_attributes = sanitize_text_field($_POST['mailercloud_attributes']);
                     $selected_mailercloud_attributes = sanitize_text_field($_POST['mailercloud_attributes']);
