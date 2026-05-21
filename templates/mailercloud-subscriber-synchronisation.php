@@ -204,6 +204,7 @@ if ( ! defined( 'ABSPATH' ) ) {
         </div>
     </div>
     <form id="contact_sync_now_form" class="mc_contact_sync_now_form" action="" method="post">
+        <?php wp_nonce_field('mailercloud_admin_ajax', '_ajax_nonce'); ?>
         <div id="subscriber_synchronisation_settings_page">
             <h2>Contact Sync</h2>
             <label>You have <b><?php echo  esc_html($user_count);?></b> existing users.
@@ -261,6 +262,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
             <h2>Create new property</h2>
             <form id="newPropertyForm" action="" method="post">
+                <?php wp_nonce_field('mailercloud_admin_ajax', '_ajax_nonce'); ?>
                 <label for="fname">Attribute name*</label><br>
                 <input type="text" id="attributename" name="name" required><br>
                 <label for="lname">Field type*</label><br>
