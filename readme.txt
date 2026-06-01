@@ -3,9 +3,9 @@ Tags: mailercloud, newsletter, campaigns, forms, emails
 Contributors: Mailercloud
 Donate link: 
 Requires at least: 4.0
-Tested up to: 6.8.5
+Tested up to: 6.9.4
 Requires PHP: 7.2.5
-Stable tag: 1.0.8
+Stable tag: 1.0.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Since 2018 [Mailercloud](https://www.mailercloud.com/) has been a leading email 
 7. Mailercloud widget
 
 == Changelog ==
+= 1.0.9 =
+Compatibility: declare $plugin_path as an explicit class property on Mailercloud to avoid the "Creation of dynamic property" deprecation on PHP 8.2+. On sites where a security/monitoring plugin escalates deprecations to fatal exceptions, the Contact Sync page rendered as "There has been a critical error on this website"; with the property declared the deprecation never fires and the page renders normally. Forward-compatible with PHP 9, where dynamic properties become a hard fatal regardless of error-handler configuration.
+
 = 1.0.8 =
 Security: fix Missing Authorization (CWE-862) on three endpoints reported by Wordfence. The two `mailercloud_create_new_property` and `mailercloud_sync_contacts_now_ajax` AJAX actions, and the `mailcloud/v1/get-signup-forms` REST route, were reachable without authentication and could be abused to enumerate or modify data on the site owner's Mailercloud account. All three now require `manage_options` capability and (for AJAX) a valid nonce.
 
