@@ -76,7 +76,7 @@ Since 2018 [Mailercloud](https://www.mailercloud.com/) has been a leading email 
 
 == Changelog ==
 = 1.0.9 =
-Compatibility improvements for newer PHP versions. Resolves a rare issue that could prevent the Contact Sync page from loading on some sites.
+Tested for compatibility with PHP 8.4 and WordPress 6.9. Resolves a rare issue that could prevent the Contact Sync page from loading on some sites running newer PHP versions.
 
 = 1.0.8 =
 Security: fix Missing Authorization (CWE-862) on three endpoints reported by Wordfence. The two `mailercloud_create_new_property` and `mailercloud_sync_contacts_now_ajax` AJAX actions, and the `mailcloud/v1/get-signup-forms` REST route, were reachable without authentication and could be abused to enumerate or modify data on the site owner's Mailercloud account. All three now require `manage_options` capability and (for AJAX) a valid nonce.
