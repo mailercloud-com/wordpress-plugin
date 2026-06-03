@@ -7,7 +7,7 @@
  * Author URI:      https://mailercloud.com/
  * Text Domain:     mailercloud
  * Domain Path:     /languages
- * Version:         1.0.9
+ * Version:         1.0.10
  *
  * @package         Mailercloud
  */
@@ -23,7 +23,7 @@ class Mailercloud
      * @since 0.1.0
      * @var
      */
-    public $version = '1.0.9';
+    public $version = '1.0.10';
     /* Member variables */
     public $mailercloud_api_key;
     public $default_mapping_array= [];
@@ -357,109 +357,106 @@ class Mailercloud
             if (get_option('mailercloud_api_key')) {
                 $api_key = get_option('mailercloud_api_key') ;
             }
-            $users = get_users_by_role(
-                'subscriber',
-                'user_nicename',
-                'ASC'
-            );
-            if (!empty($users)) {
+            // Count subscribers via the WP core aggregate — does not load user objects into memory.
+            $role_counts = count_users();
+            $user_count = isset($role_counts['avail_roles']['subscriber'])
+                ? (int) $role_counts['avail_roles']['subscriber']
+                : 0;
+            if ($user_count > 0) {
                 if ($list_id) {
                     if ($api_key) {
                         $file = $this->mailercloud_get_plugin_path() . '/assets/json_files/attribute_mapping.json';
                         $attribute_mapping_arr = json_decode(file_get_contents($file), true);
                         if (!empty($attribute_mapping_arr)) {
-                            $temp = [];
-                            $temp_final = [];
-                            $user_count = count($users);
                             $limit = 49;
-                            $page = 1;
-                            // How many pages will there be
-                            $pages = ceil($user_count / $limit);
-                            $offset = ($page - 1)  * $limit;
-                              
-                            // Some information to display to the user
-                            $start = $offset + 1;
-                            $end = min(($offset + $limit), $user_count);
-                            $contactss =[];
-                            $contacts_data=[];
-                            $total_inserted =0;
-                            $total_skipped =0;
-                            $total_submitted =0;
-                            $total_updated =0;
-                            foreach ($users as $user) {
-                                $temp_custom =[];
-                                foreach ($attribute_mapping_arr as $row) {
-                                    $find="custom_fields_";
-                                    if ($row['wordpress_attribute'] == 'tags') {
-                                        $temp['tags'] = json_decode($row['mailercloud_attribute'],true);
-                                    } else if (strpos($row['mailercloud_attribute'], $find) !== false) {
-                                        $mailercloud_attribute_key = str_replace($find, '', $row['mailercloud_attribute']);
-                                        $temp_custom[$mailercloud_attribute_key] = $user[$row['wordpress_attribute']];
-                                    } else {
-                                        $temp[$row['mailercloud_attribute']] =$user[$row['wordpress_attribute']];
+                            $pages = (int) ceil($user_count / $limit);
+                            $total_inserted = 0;
+                            $total_skipped = 0;
+                            $total_submitted = 0;
+                            $total_updated = 0;
+                            $user_data = [];
+
+                            // Fetch and send one batch of users at a time — keeps peak memory bounded
+                            // regardless of how many subscribers the site has.
+                            for ($page = 1; $page <= $pages; $page++) {
+                                $offset = ($page - 1) * $limit;
+                                $user_batch = get_users(array(
+                                    'role'    => 'subscriber',
+                                    'orderby' => 'user_nicename',
+                                    'order'   => 'ASC',
+                                    'number'  => $limit,
+                                    'offset'  => $offset,
+                                    'fields'  => 'ID',
+                                ));
+                                if (empty($user_batch)) {
+                                    continue;
+                                }
+                                $temp_final = [];
+                                foreach ($user_batch as $user_id) {
+                                    $user = getwordpressUserAttributes($user_id);
+                                    $temp = [];
+                                    $temp_custom = [];
+                                    foreach ($attribute_mapping_arr as $row) {
+                                        $find = "custom_fields_";
+                                        if ($row['wordpress_attribute'] == 'tags') {
+                                            $temp['tags'] = json_decode($row['mailercloud_attribute'], true);
+                                        } else if (strpos($row['mailercloud_attribute'], $find) !== false) {
+                                            $mailercloud_attribute_key = str_replace($find, '', $row['mailercloud_attribute']);
+                                            $temp_custom[$mailercloud_attribute_key] = isset($user[$row['wordpress_attribute']]) ? $user[$row['wordpress_attribute']] : '';
+                                        } else {
+                                            $temp[$row['mailercloud_attribute']] = isset($user[$row['wordpress_attribute']]) ? $user[$row['wordpress_attribute']] : '';
+                                        }
+                                    }
+                                    if (!empty($temp_custom)) {
+                                        $temp['custom_fields'] = $temp_custom;
+                                    }
+                                    if (!empty($temp)) {
+                                        $temp_final[] = $temp;
                                     }
                                 }
-                                if (!empty($temp_custom)) {
-                                    $temp['custom_fields'] = $temp_custom;
-                                }
-                                if (!empty($temp)) {
-                                    $temp_final[] = $temp;
-                                }
-
-                                if ($start == $end) {
-                                    $page = $page + 1;
-                                    $offset = ($page - 1)  * $limit;
-                                    $start = $offset + 1;
-                                    $end = min(($offset + $limit), $user_count);
-                                    $contactss = $temp_final;
-                                    $contacts_data['contacts'] = $contactss;
-                                    $contacts_data['list_id'] = $list_id;
-                                    $response= callWpRemoteRestApi(
+                                if (!empty($temp_final)) {
+                                    $contacts_data = array(
+                                        'contacts' => $temp_final,
+                                        'list_id'  => $list_id,
+                                    );
+                                    $response = callWpRemoteRestApi(
                                         'POST',
                                         MAILERCLOUD_SUBSCRIBER_SYNC_CONTACTS_BATCH_API_URL,
                                         $api_key,
                                         json_encode($contacts_data)
                                     );
-                                      
                                     if (isset($response['data'])) {
-                                        $user_data = $response['data'];
-                                        $total_inserted += $response['data']['inserted'];
-                                        $total_skipped += $response['data']['skipped'];
-                                        $total_submitted += $response['data']['submitted'];
-                                        $total_updated += $response['data']['updated'];
+                                        $total_inserted  += isset($response['data']['inserted']) ? (int) $response['data']['inserted'] : 0;
+                                        $total_skipped   += isset($response['data']['skipped']) ? (int) $response['data']['skipped'] : 0;
+                                        $total_submitted += isset($response['data']['submitted']) ? (int) $response['data']['submitted'] : 0;
+                                        $total_updated   += isset($response['data']['updated']) ? (int) $response['data']['updated'] : 0;
                                         $msg = true;
-                                        foreach ($users as $user) {
-                                            $userData = get_user_by('email', $user['Email']);
-                                        }
                                     } else {
-                                        $message = $response['message'];
+                                        $message = isset($response['message']) ? $response['message'] : '';
                                         if (isset($response['errors'])) {
                                             $errors = $response['errors'];
                                         }
                                         $msg = false;
                                     }
-                                    $contactss =[];
-                                    $contacts_data=[];
-                                    $temp_final =[];
-                                    usleep(400000);
-                                } else {
-                                    $start++;
                                 }
+                                // Free per-batch memory before fetching the next batch.
+                                unset($user_batch, $temp_final);
+                                usleep(400000);
                             }
                             $message = 'Contact synchronization has been completed';
-                            $user_data['inserted']= $total_inserted ;
-                            $user_data['skipped']  =  $total_skipped;
+                            $user_data['inserted']  = $total_inserted;
+                            $user_data['skipped']   = $total_skipped;
                             $user_data['submitted'] = $total_submitted;
-                            $user_data['updated'] =    $total_updated;
-                            $response['message'] =  $message;
-                            $response['status'] =  $status;
-                            $response['data'] = $user_data;
+                            $user_data['updated']   = $total_updated;
+                            $response['message'] = $message;
+                            $response['status']  = $status;
+                            $response['data']    = $user_data;
                         }
                     }
                 } else {
-                    $message='Please choose the Mailcloud list to sync with.';
-                    $response['status'] =  0;
-                    $response['message'] =  $message;
+                    $message = 'Please choose the Mailcloud list to sync with.';
+                    $response['status']  = 0;
+                    $response['message'] = $message;
                 }
             }
         }
@@ -672,76 +669,95 @@ class Mailercloud
      */
     public function sync_contact_every_five_minutes_event()
     {
-        $list_id ='';
-        $api_key='';
-        $users=[];
-        $attribute_mapping_arr=[];
+        $list_id = '';
+        $api_key = '';
         if (get_option('mailercloud_selected_sync_list_id')) {
-            $mailercloud_selected_sync_list_id = get_option('mailercloud_selected_sync_list_id');
-            $list_id = $mailercloud_selected_sync_list_id;
+            $list_id = get_option('mailercloud_selected_sync_list_id');
         }
         if (get_option('mailercloud_api_key')) {
-            $api_key = get_option('mailercloud_api_key') ;
+            $api_key = get_option('mailercloud_api_key');
         }
-        $users = get_users_by_role(
-            'subscriber',
-            'user_nicename',
-            'ASC'
-        );
-        if (!empty($users)) {
-            if ($list_id) {
-                if ($api_key) {
-                    $file = $this->mailercloud_get_plugin_path() . '/assets/json_files/attribute_mapping.json';
-                    $attribute_mapping_arr = json_decode(file_get_contents($file), true);
-                    $contacts = [];
-                    if (!empty($attribute_mapping_arr)) {
-                        $temp = [];
-                        $temp_final = [];
-                        foreach ($users as $user) {
-                            $temp_custom =[];
-                            foreach ($attribute_mapping_arr as $row) {
-                                $find="custom_fields_";
-                                if ($row['wordpress_attribute'] == 'tags') {
-                                    $temp['tags'] =  json_decode($row['mailercloud_attribute'],true);
-                                } elseif (strpos($row['mailercloud_attribute'], $find) !== false) {
-                                    $mailercloud_attribute_key = str_replace($find, '', $row['mailercloud_attribute']);
-                                    $temp_custom[$mailercloud_attribute_key] = $user[$row['wordpress_attribute']];
-                                } else {
-                                    $temp[$row['mailercloud_attribute']] =$user[$row['wordpress_attribute']] ;
-                                }
-                            }
-                            if (!empty($temp_custom)) {
-                                $temp['custom_fields'] = $temp_custom;
-                            }
-                            if (!empty($temp)) {
-                                $temp_final[] = $temp;
-                            }
-                        }
-                   
-                        $contacts = $temp_final;
-               
-                        $contact_data['contacts'] = $contacts;
-                        $contact_data['list_id'] = $list_id;
-                        
-                        $response= callWpRemoteRestApi(
-                            'POST',
-                            MAILERCLOUD_SUBSCRIBER_SYNC_CONTACTS_BATCH_API_URL,
-                            $api_key,
-                            json_encode($contact_data)
-                        );
-                        if (isset($response['data'])) {
-                            $user_data = $response['data'];
-                            foreach ($users as $user) {
-                                $userData = get_user_by('email', $user['Email']);
-                                // $updated = update_user_meta($userData->ID, 'mailercloud_is_synched',true);
-                            }
-                        } else {
-                            $message = $response['message'];
-                            $msg = false;
-                        }
+        // Bail early if the site has not finished setup — avoids loading any user data.
+        if (empty($list_id) || empty($api_key)) {
+            return;
+        }
+        $file = $this->mailercloud_get_plugin_path() . '/assets/json_files/attribute_mapping.json';
+        $attribute_mapping_arr = json_decode(file_get_contents($file), true);
+        if (empty($attribute_mapping_arr)) {
+            return;
+        }
+        $role_counts = count_users();
+        $user_count = isset($role_counts['avail_roles']['subscriber'])
+            ? (int) $role_counts['avail_roles']['subscriber']
+            : 0;
+        if ($user_count === 0) {
+            return;
+        }
+        $limit = 49;
+        $pages = (int) ceil($user_count / $limit);
+        // Cap how long a single cron run takes, so big sites don't pile up overlapping jobs.
+        $start_time = time();
+        $max_runtime = 60; // seconds; remaining batches will be picked up by the next cron tick
+        for ($page = 1; $page <= $pages; $page++) {
+            if ((time() - $start_time) > $max_runtime) {
+                break;
+            }
+            $offset = ($page - 1) * $limit;
+            $user_batch = get_users(array(
+                'role'    => 'subscriber',
+                'orderby' => 'user_nicename',
+                'order'   => 'ASC',
+                'number'  => $limit,
+                'offset'  => $offset,
+                'fields'  => 'ID',
+            ));
+            if (empty($user_batch)) {
+                continue;
+            }
+            $temp_final = [];
+            foreach ($user_batch as $user_id) {
+                $user = getwordpressUserAttributes($user_id);
+                $temp = [];
+                $temp_custom = [];
+                foreach ($attribute_mapping_arr as $row) {
+                    $find = "custom_fields_";
+                    if ($row['wordpress_attribute'] == 'tags') {
+                        $temp['tags'] = json_decode($row['mailercloud_attribute'], true);
+                    } elseif (strpos($row['mailercloud_attribute'], $find) !== false) {
+                        $mailercloud_attribute_key = str_replace($find, '', $row['mailercloud_attribute']);
+                        $temp_custom[$mailercloud_attribute_key] = isset($user[$row['wordpress_attribute']]) ? $user[$row['wordpress_attribute']] : '';
+                    } else {
+                        $temp[$row['mailercloud_attribute']] = isset($user[$row['wordpress_attribute']]) ? $user[$row['wordpress_attribute']] : '';
                     }
                 }
+                if (!empty($temp_custom)) {
+                    $temp['custom_fields'] = $temp_custom;
+                }
+                if (!empty($temp)) {
+                    $temp_final[] = $temp;
+                }
             }
+            if (empty($temp_final)) {
+                unset($user_batch, $temp_final);
+                continue;
+            }
+            $contact_data = array(
+                'contacts' => $temp_final,
+                'list_id'  => $list_id,
+            );
+            $response = callWpRemoteRestApi(
+                'POST',
+                MAILERCLOUD_SUBSCRIBER_SYNC_CONTACTS_BATCH_API_URL,
+                $api_key,
+                json_encode($contact_data)
+            );
+            if (isset($response['data'])) {
+                $user_data = $response['data'];
+            } else {
+                $message = isset($response['message']) ? $response['message'] : '';
+            }
+            // Free per-batch memory before fetching the next batch.
+            unset($user_batch, $temp_final);
         }
     }
 
@@ -842,13 +858,11 @@ class Mailercloud
         $list_id ='';
         $errors= [];
         $user_count = 0;
-        $users = get_users_by_role(
-            'subscriber',
-            'user_nicename',
-            'ASC'
-        );
-     
-        $user_count = count($users);
+        // Use count_users() instead of loading every user object — works for sites with large subscriber counts.
+        $role_counts = count_users();
+        if (isset($role_counts['avail_roles']['subscriber'])) {
+            $user_count = (int) $role_counts['avail_roles']['subscriber'];
+        }
         $wordpress_attributes = [];
         $selected_wordpress_attributes = [];
         $selected_mailercloud_attributes = [];
@@ -971,11 +985,6 @@ class Mailercloud
             $mailercloud_selected_sync_list = get_option('mailercloud_selected_sync_list');
             $selected_list_name = $mailercloud_selected_sync_list;
         }
-        $users = get_users_by_role(
-            'subscriber',
-            'user_nicename',
-            'ASC'
-        );
         if (get_option('mailercloud_api_key')) {
             $api_key = get_option('mailercloud_api_key') ;
         }

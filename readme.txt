@@ -5,7 +5,7 @@ Donate link:
 Requires at least: 4.0
 Tested up to: 6.9.4
 Requires PHP: 7.2.5
-Stable tag: 1.0.9
+Stable tag: 1.0.10
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Since 2018 [Mailercloud](https://www.mailercloud.com/) has been a leading email 
 7. Mailercloud widget
 
 == Changelog ==
+= 1.0.10 =
+Performance fix for sites with large numbers of WordPress users. The Contact Sync page now loads quickly regardless of how many users are on the site, and the sync runs in small batches instead of attempting to process every user at once.
+
 = 1.0.9 =
 Tested for compatibility with PHP 8.4 and WordPress 6.9. Resolves a rare issue that could prevent the Contact Sync page from loading on some sites running newer PHP versions.
 
