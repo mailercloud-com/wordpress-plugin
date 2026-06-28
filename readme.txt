@@ -5,7 +5,7 @@ Donate link:
 Requires at least: 4.0
 Tested up to: 6.9.4
 Requires PHP: 7.2.5
-Stable tag: 1.0.10
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -28,6 +28,8 @@ Enhance your email marketing with Mailercloud's WordPress plugin. Integrate web 
 * **Analytics**: Access detailed reports to track email performance.
 * **GDPR Compliance**: Manage user consent and ensure compliance.
 * **[Integration](https://www.mailercloud.com/integrations/)**: Connect with popular CRM and eCommerce platforms.
+* **Form plugin connectors (new in 1.1.0)**: Send submissions from Contact Form 7, WPForms, Elementor Forms, Gravity Forms, Ninja Forms and Formidable straight into a Mailercloud list — no third-party bridge needed. Map each form field to a Mailercloud field and optionally apply tags. Visitors are captured by email even without a WordPress account.
+* **Capture analytics (new in 1.1.0)**: See how many leads the plugin has captured, by source, right inside WordPress.
 
 == Additional Features ==
 
@@ -75,6 +77,9 @@ Since 2018 [Mailercloud](https://www.mailercloud.com/) has been a leading email 
 7. Mailercloud widget
 
 == Changelog ==
+= 1.1.0 =
+New: Form-plugin connectors. Send submissions from Contact Form 7, WPForms, Elementor Forms, Gravity Forms, Ninja Forms and Formidable directly to a Mailercloud list, with per-field mapping and optional tags — visitors are captured even without a WordPress account. Adds an Integrations page to configure connectors and an Analytics page showing leads captured by source.
+
 = 1.0.10 =
 Performance fix for sites with large numbers of WordPress users. The Contact Sync page now loads quickly regardless of how many users are on the site, and the sync runs in small batches instead of attempting to process every user at once.
 
