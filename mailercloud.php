@@ -481,10 +481,11 @@ class Mailercloud
             }
         }
 
+        // Tags are stored as NAMES (the contacts/upsert API matches tags by name, not id).
         if (! empty($_POST['tags']) && is_array($_POST['tags'])) {
-            $tag_ids = array_values(array_filter(array_map('sanitize_text_field', wp_unslash($_POST['tags']))));
-            if (! empty($tag_ids)) {
-                $mapping[] = array('wordpress_attribute' => 'tags', 'mailercloud_attribute' => wp_json_encode($tag_ids));
+            $tag_names = array_values(array_filter(array_map('sanitize_text_field', wp_unslash($_POST['tags']))));
+            if (! empty($tag_names)) {
+                $mapping[] = array('wordpress_attribute' => 'tags', 'mailercloud_attribute' => wp_json_encode($tag_names));
             }
         }
 

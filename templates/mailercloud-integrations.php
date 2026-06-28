@@ -184,7 +184,8 @@ if (! function_exists('mc_render_attr_options')) {
                                 <input type="text" class="mc-drop-search mc-tag-search" placeholder="<?php esc_attr_e('Search tags…', 'mailercloud'); ?>" autocomplete="off" />
                                 <div class="mc-drop-options mc-tag-options">
                                     <?php foreach ($tags as $tid => $tname) : ?>
-                                        <label><input type="checkbox" class="mc-tag-cb" value="<?php echo esc_attr($tid); ?>" data-name="<?php echo esc_attr($tname); ?>" <?php checked(in_array((string) $tid, $selected_tags, true)); ?> /> <?php echo esc_html($tname); ?></label>
+                                        <?php // Value is the tag NAME — the Mailercloud upsert/contacts API matches tags by name, not id (same as the Contact Sync page). ?>
+                                        <label><input type="checkbox" class="mc-tag-cb" value="<?php echo esc_attr($tname); ?>" <?php checked(in_array((string) $tname, $selected_tags, true)); ?> /> <?php echo esc_html($tname); ?></label>
                                     <?php endforeach; ?>
                                 </div>
                             </div>

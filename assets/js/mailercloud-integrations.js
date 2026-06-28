@@ -32,8 +32,9 @@
 		checked.reverse().forEach(function (lbl) { $opts.prepend(lbl); });
 	}
 	function initTagState($form) {
+		// Tag checkbox value IS the tag name (the API matches tags by name).
 		var s = {};
-		$form.find('.mc-tag-cb:checked').each(function () { s[$(this).val()] = $(this).attr('data-name') || $.trim($(this).parent().text()); });
+		$form.find('.mc-tag-cb:checked').each(function () { var v = $(this).val(); s[v] = v; });
 		$form.data('selTags', s);
 		syncTagSummary($form);
 	}
@@ -125,8 +126,9 @@
 	$(document).on('change', '.mc-tag-cb', function () {
 		var $form = $(this).closest('.mc-connector-form');
 		var s = selTags($form);
-		if ($(this).is(':checked')) { s[$(this).val()] = $(this).attr('data-name') || $.trim($(this).parent().text()); }
-		else { delete s[$(this).val()]; }
+		var v = $(this).val();
+		if ($(this).is(':checked')) { s[v] = v; }
+		else { delete s[v]; }
 		syncTagSummary($form);
 	});
 
@@ -141,7 +143,8 @@
 				if (!rows.length) { $opts.html('<div class="mc-empty">No tags found.</div>'); return; }
 				$opts.empty();
 				rows.forEach(function (r) {
-					var $cb = $('<input type="checkbox" class="mc-tag-cb">').val(r.id).attr('data-name', r.text).prop('checked', s.hasOwnProperty(String(r.id)));
+					// Checkbox value is the tag NAME (API matches tags by name).
+					var $cb = $('<input type="checkbox" class="mc-tag-cb">').val(r.text).prop('checked', s.hasOwnProperty(r.text));
 					$opts.append($('<label></label>').append($cb).append(document.createTextNode(' ' + r.text)));
 				});
 			});
