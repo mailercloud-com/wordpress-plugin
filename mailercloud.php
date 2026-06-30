@@ -7,7 +7,7 @@
  * Author URI:      https://mailercloud.com/
  * Text Domain:     mailercloud
  * Domain Path:     /languages
- * Version:         1.0.10
+ * Version:         1.1.0
  *
  * @package         Mailercloud
  */
@@ -23,7 +23,7 @@ class Mailercloud
      * @since 0.1.0
      * @var
      */
-    public $version = '1.0.10';
+    public $version = '1.1.0';
     /* Member variables */
     public $mailercloud_api_key;
     public $default_mapping_array= [];
@@ -76,6 +76,25 @@ class Mailercloud
         );
         add_action('init', array($this,'mailercloud_add_custom_shortcode'));
 
+        // -------------------------------------------------------------------------
+        // Recurring background sync — INTENTIONALLY LEFT DORMANT (do not enable yet).
+        //
+        // Under standard WP-Cron this handler never fires: the constructor returns
+        // early on DOING_CRON (above) before this registration runs, so the scheduled
+        // 'mailercloud_cron_every_five_minutes' event has no callback during a real
+        // cron request. We are deliberately KEEPING this as-is for now because:
+        //   1. Real-time sync (user_register / profile_update, registered just below)
+        //      already keeps contacts up to date for new and edited users, and
+        //      "Sync My Users" handles full backfill on demand.
+        //   2. Activating a 5-minute FULL re-sync across all installs would create a
+        //      large, fleet-wide contact-upsert load and is not safe to switch on
+        //      without a redesign (planned: a DAILY, changed-only safety re-sync).
+        // The code is kept (not removed) for that future, planned enablement. Do NOT
+        // move this registration above the DOING_CRON return without that plan.
+        // (A harmless "invalid_schedule" notice may appear in debug.log while dormant;
+        //  it is cosmetic and tracked for the future cron redesign.)
+        // See: sync_contact_every_five_minutes_event() and mailercloud_cron_extra_schedules().
+        // -------------------------------------------------------------------------
         add_filter('cron_schedules', array($this,'mailercloud_cron_extra_schedules'));
         add_action('mailercloud_cron_every_five_minutes', array($this,'sync_contact_every_five_minutes_event'));
         add_action('user_register', array($this,'mailercloud_registration_save'), 11, 1);
@@ -93,6 +112,13 @@ class Mailercloud
             "wp_ajax_mailercloud_sync_contacts_now_ajax",
             array($this, "mailercloud_sync_contacts_now_ajax")
         );
+        add_action("wp_ajax_mailercloud_save_connector_map", array($this, "mailercloud_save_connector_map"));
+        add_action("wp_ajax_mailercloud_delete_connector_feed", array($this, "mailercloud_delete_connector_feed"));
+        add_action("wp_ajax_mailercloud_get_form_fields", array($this, "mailercloud_get_form_fields"));
+        add_action("wp_ajax_mailercloud_search_lists", array($this, "mailercloud_search_lists"));
+        add_action("wp_ajax_mailercloud_search_tags", array($this, "mailercloud_search_tags"));
+        add_action("wp_ajax_mailercloud_dismiss_review", array($this, "mailercloud_dismiss_review"));
+        add_action("admin_notices", array($this, "mailercloud_maybe_show_review_notice"));
     }
 
 
@@ -161,17 +187,24 @@ class Mailercloud
      */
     public function mailercloud_admin_enqueue($hook)
     {
-        $page = isset($_GET["page"]) ? sanitize_text_field($_GET["page"]) : "";
+        $page = isset($_GET["page"]) ? sanitize_text_field(wp_unslash($_GET["page"])) : "";
 
         // Add condition for css & js include for admin page
-        if ($page != ('mailercloud-settings-page' || 'mailercloud-subscriber-synchronisation' || 'mailercloud-signup-form-listing')) {
+        $mc_pages = array(
+            'mailercloud-settings-page',
+            'mailercloud-subscriber-synchronisation',
+            'mailercloud-signup-form-listing',
+            'mailercloud-integrations',
+            'mailercloud-analytics',
+        );
+        if (! in_array($page, $mc_pages, true)) {
             return;
         }
         wp_register_style(
             'mailercloud-admin',
             plugins_url('assets/css/mailercloud-style.css', __FILE__),
             array(),
-            $this->version
+            @filemtime($this->mailercloud_get_plugin_path() . '/assets/css/mailercloud-style.css') ?: $this->version
         );
         wp_register_style(
             'mailercloud-sweetalert',
@@ -195,7 +228,24 @@ class Mailercloud
         );
         wp_enqueue_script('mailercloud-sweetalert');
         wp_enqueue_script('mailercloud-admin-script');
-      
+
+        wp_register_script(
+            'mailercloud-integrations',
+            plugins_url('assets/js/mailercloud-integrations.js', __FILE__),
+            array('jquery', 'mailercloud-admin-script', 'mailercloud-sweetalert'),
+            @filemtime($this->mailercloud_get_plugin_path() . '/assets/js/mailercloud-integrations.js') ?: $this->version,
+            true
+        );
+        // Only load the connector-mapping script on the Integrations page
+        // (keeps the authenticated save-connector AJAX surface off unrelated pages).
+        if ($page === 'mailercloud-integrations') {
+            wp_enqueue_script('mailercloud-integrations');
+            wp_localize_script('mailercloud-integrations', 'mcInt', array(
+                'ajaxurl' => admin_url('admin-ajax.php'),
+                'nonce'   => wp_create_nonce('mailercloud_admin_ajax'),
+            ));
+        }
+
         wp_localize_script(
             'mailercloud-admin-script',
             'admAjax',
@@ -243,8 +293,15 @@ class Mailercloud
     {
         require_once $this->mailercloud_get_plugin_path() . '/config/constants.php';
         require_once $this->mailercloud_get_plugin_path() . '/includes/mailercloud_functions.php';
+        require_once $this->mailercloud_get_plugin_path() . '/includes/class-mc-contact-sync.php';
+        require_once $this->mailercloud_get_plugin_path() . '/includes/class-mc-analytics.php';
+        require_once $this->mailercloud_get_plugin_path() . '/includes/class-mc-connectors-loader.php';
         require_once $this->mailercloud_get_plugin_path() . '/widgets/mailercloud_widget.php';
         require_once $this->mailercloud_get_plugin_path() . '/blocks/mailercloud-forms.php';
+
+        // Register form-plugin connectors on init (after host form plugins have loaded).
+        $mc_connectors = new Mc_Connectors_Loader();
+        add_action('init', array($mc_connectors, 'register'));
     }
     
     /**
@@ -255,8 +312,8 @@ class Mailercloud
     public function add_mailercloud_admin_menu()
     {
         add_menu_page(
-            __('MailerCloud', 'mailercloud'),
-            __('MailerCloud', 'mailercloud'),
+            __('Mailercloud', 'mailercloud'),
+            __('Mailercloud', 'mailercloud'),
             'manage_options',
             'mailercloud-settings-page',
             array($this, 'create_mailercloud_settings_page'),
@@ -272,8 +329,8 @@ class Mailercloud
         );
         add_submenu_page(
             'mailercloud-settings-page',
-            __('Contact Sync', 'mailercloud'),
-            __('Contact Sync', 'mailercloud'),
+            __('Contact Map', 'mailercloud'),
+            __('Contact Map', 'mailercloud'),
             'manage_options',
             'mailercloud-subscriber-synchronisation',
             array($this, 'create_mailercloud_synchronisation_settings_page')
@@ -286,6 +343,431 @@ class Mailercloud
             'mailercloud-signup-form-listing',
             array($this, 'create_mailercloudp_form_listing_settings_page')
         );
+        add_submenu_page(
+            'mailercloud-settings-page',
+            __('Integrations', 'mailercloud'),
+            __('Integrations', 'mailercloud'),
+            'manage_options',
+            'mailercloud-integrations',
+            array($this, 'create_mailercloud_integrations_page')
+        );
+        add_submenu_page(
+            'mailercloud-settings-page',
+            __('Analytics', 'mailercloud'),
+            __('Analytics', 'mailercloud'),
+            'manage_options',
+            'mailercloud-analytics',
+            array($this, 'create_mailercloud_analytics_page')
+        );
+    }
+
+    /**
+     * Fetch MailerCloud lists, custom fields and tags for the connector mapping UI.
+     *
+     * @return array [ $lists (id=>name), $custom_fields (id=>name), $tags (id=>name) ]
+     */
+    private function mailercloud_fetch_mc_meta()
+    {
+        $lists = array();
+        $custom_fields = array();
+        $tags = array();
+        $api_key = get_option('mailercloud_api_key');
+        if (! $api_key) {
+            return array($lists, $custom_fields, $tags);
+        }
+        $list_resp = callWpRemoteRestApi('POST', MAILERCLOUD_SUBSCRIBER_SYNC_API_URL, $api_key, json_encode(array(
+            'limit' => 100, 'list_type' => 1, 'page' => 1, 'search_name' => '', 'sort_field' => 'name', 'sort_order' => 'asc',
+        )));
+        if (! empty($list_resp['data'])) {
+            foreach ($list_resp['data'] as $l) {
+                if (isset($l['id'])) {
+                    $lists[$l['id']] = isset($l['name']) ? $l['name'] : $l['id'];
+                }
+            }
+        }
+        $prop_resp = callWpRemoteRestApi('POST', MAILERCLOUD_SUBSCRIBER_SYNC_CONTACT_PROPERTY_API_URL, $api_key, json_encode(array(
+            'limit' => 100, 'page' => 1, 'search' => '',
+        )));
+        if (! empty($prop_resp['data'])) {
+            foreach ($prop_resp['data'] as $f) {
+                if (empty($f['is_default']) && isset($f['id'])) {
+                    $custom_fields[$f['id']] = isset($f['field_name']) ? $f['field_name'] : $f['id'];
+                }
+            }
+        }
+        $tag_resp = callWpRemoteRestApi('POST', MAILERCLOUD_TAG_LISTING_API_URL, $api_key, json_encode(array(
+            'limit' => 100, 'page' => 1, 'search' => '',
+        )));
+        if (! empty($tag_resp['data'])) {
+            foreach ($tag_resp['data'] as $t) {
+                if (isset($t['id'])) {
+                    $tags[$t['id']] = isset($t['tag_name']) ? $t['tag_name'] : $t['id'];
+                }
+            }
+        }
+        return array($lists, $custom_fields, $tags);
+    }
+
+    /**
+     * Integrations admin page — connect third-party form plugins.
+     */
+    public function create_mailercloud_integrations_page()
+    {
+        if (! current_user_can('manage_options')) {
+            return;
+        }
+        $api_key = get_option('mailercloud_api_key');
+        $loader = new Mc_Connectors_Loader();
+        $connectors = $loader->all();
+        $mc_connector_nonce = wp_create_nonce('mailercloud_admin_ajax');
+
+        // Two views: the connectors list, and a per-connector configure page.
+        // Clicking a connector on the list goes to ?page=mailercloud-integrations&connector=<slug>.
+        $sel = isset($_GET['connector']) ? sanitize_key(wp_unslash($_GET['connector'])) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $mc_connector = null;
+        foreach ($connectors as $c) {
+            if ($c->slug() === $sel && $c->is_active()) {
+                $mc_connector = $c;
+                break;
+            }
+        }
+        $mc_view          = $mc_connector ? 'config' : 'list';
+        $lists            = array();
+        $custom_fields    = array();
+        $tags             = array();
+        $connector_forms  = array();
+        $connector_fields = array();
+
+        // Only the configure page needs the Mailercloud meta + form fields (avoids API calls on the list).
+        if ($mc_view === 'config') {
+            list($lists, $custom_fields, $tags) = $this->mailercloud_fetch_mc_meta();
+            $slug = $mc_connector->slug();
+            $connector_forms[$slug] = $mc_connector->get_forms();
+            $fields_by_form = array();
+            foreach ($mc_connector->get_feeds() as $feed) {
+                $fid = isset($feed['form_id']) ? (string) $feed['form_id'] : '';
+                if ($fid !== '' && ! isset($fields_by_form[$fid])) {
+                    $fields_by_form[$fid] = $mc_connector->get_form_fields($fid);
+                }
+            }
+            $connector_fields[$slug] = $fields_by_form;
+        }
+        require_once $this->mailercloud_get_plugin_path() . '/templates/mailercloud-integrations.php';
+    }
+
+    /**
+     * Analytics admin page — lead-capture counts from this plugin.
+     */
+    public function create_mailercloud_analytics_page()
+    {
+        if (! current_user_can('manage_options')) {
+            return;
+        }
+        $stats = class_exists('Mc_Analytics') ? Mc_Analytics::all() : array();
+        $total_captured = class_exists('Mc_Analytics') ? Mc_Analytics::total_captured() : 0;
+        $loader = new Mc_Connectors_Loader();
+        $labels = array();
+        foreach ($loader->all() as $c) {
+            $labels[$c->slug()] = $c->label();
+        }
+        require_once $this->mailercloud_get_plugin_path() . '/templates/mailercloud-analytics.php';
+    }
+
+    /** @return Mc_Connector_Base|null the connector for a slug (for reading its feeds). */
+    private function mailercloud_connector_by_slug($slug)
+    {
+        $loader = new Mc_Connectors_Loader();
+        foreach ($loader->all() as $c) {
+            if ($c->slug() === $slug) {
+                return $c;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Sanitize + validate one raw POST feed into a stored feed. On validation failure
+     * for an enabled feed this sends a JSON error and exits.
+     *
+     * @param array $rf        raw feed (already wp_unslash'd)
+     * @param int   $label_num number shown in validation messages
+     * @return array { id, enabled, form_id, list_id, mapping[] }
+     */
+    private function mailercloud_build_feed($rf, $label_num)
+    {
+        $enabled = ! empty($rf['enabled']);
+        $list_id = isset($rf['list_id']) ? substr(sanitize_text_field($rf['list_id']), 0, 64) : '';
+        $form_id = isset($rf['form_id']) ? substr(sanitize_text_field($rf['form_id']), 0, 64) : '';
+        $feed_id = isset($rf['id']) ? substr(sanitize_text_field($rf['id']), 0, 40) : '';
+
+        $mapping = array();
+        if (! empty($rf['mapping']) && is_array($rf['mapping'])) {
+            foreach ($rf['mapping'] as $pair) {
+                if (! isset($pair['field_key'], $pair['mc_attr'])) {
+                    continue;
+                }
+                $field_key = substr(sanitize_text_field($pair['field_key']), 0, 200);
+                $mc_attr   = sanitize_text_field($pair['mc_attr']);
+                if ($field_key === '' || $mc_attr === '') {
+                    continue;
+                }
+                if (! in_array($mc_attr, array('email', 'name', 'last_name'), true)
+                    && ! preg_match('/^custom_fields_[A-Za-z0-9_-]+$/', $mc_attr)) {
+                    continue;
+                }
+                $mapping[] = array('wordpress_attribute' => $field_key, 'mailercloud_attribute' => $mc_attr);
+            }
+        }
+        // Tags stored as NAMES (the contacts/upsert API matches tags by name).
+        if (! empty($rf['tags']) && is_array($rf['tags'])) {
+            $tag_names = array_values(array_filter(array_map('sanitize_text_field', $rf['tags'])));
+            if (! empty($tag_names)) {
+                $mapping[] = array('wordpress_attribute' => 'tags', 'mailercloud_attribute' => wp_json_encode($tag_names));
+            }
+        }
+
+        if ($enabled) {
+            $has_email = false;
+            foreach ($mapping as $m) {
+                if ($m['mailercloud_attribute'] === 'email' && $m['wordpress_attribute'] !== '') {
+                    $has_email = true;
+                    break;
+                }
+            }
+            if (! $has_email) {
+                /* translators: %d: form-mapping number */
+                wp_send_json_error(array('message' => sprintf(__('Form mapping #%d: map a form field to Email — it is required.', 'mailercloud'), $label_num)), 400);
+            }
+            if (empty($list_id)) {
+                /* translators: %d: form-mapping number */
+                wp_send_json_error(array('message' => sprintf(__('Form mapping #%d: choose a list to add contacts to.', 'mailercloud'), $label_num)), 400);
+            }
+        }
+
+        return array(
+            'id'      => ($feed_id !== '' ? $feed_id : uniqid('f')),
+            'enabled' => $enabled,
+            'form_id' => $form_id,
+            'list_id' => $list_id,
+            'mapping' => $mapping,
+        );
+    }
+
+    /**
+     * AJAX: save a connector's mapping. Per-feed when 'feed' is posted (merge by id —
+     * validates only that feed), or all feeds when 'feeds' is posted. Nonce + cap guarded.
+     */
+    public function mailercloud_save_connector_map()
+    {
+        check_ajax_referer('mailercloud_admin_ajax', '_ajax_nonce');
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'forbidden'), 403);
+        }
+        $allowed_slugs = array('cf7', 'wpforms', 'elementor', 'gravity', 'ninja', 'formidable');
+        $slug = isset($_POST['slug']) ? sanitize_key(wp_unslash($_POST['slug'])) : '';
+        if (! in_array($slug, $allowed_slugs, true)) {
+            wp_send_json_error(array('message' => 'invalid connector'), 400);
+        }
+        $connector = $this->mailercloud_connector_by_slug($slug);
+        $existing  = $connector ? $connector->get_feeds() : array();
+
+        // Per-feed save: merge this one feed into the existing list (replace by id, else append).
+        if (isset($_POST['feed']) && is_array($_POST['feed'])) {
+            $feed   = $this->mailercloud_build_feed(wp_unslash($_POST['feed']), 1);
+            $merged = array();
+            $found  = false;
+            foreach ($existing as $f) {
+                if ((string) (isset($f['id']) ? $f['id'] : '') === (string) $feed['id']) {
+                    $merged[] = $feed;
+                    $found = true;
+                } else {
+                    $merged[] = $f;
+                }
+            }
+            if (! $found) {
+                $merged[] = $feed;
+            }
+            update_option('mailercloud_connector_map_' . $slug, array('feeds' => $merged), false);
+            wp_send_json_success(array('message' => 'saved', 'feed_id' => $feed['id']));
+        }
+
+        // Bulk save: replace all feeds.
+        $raw_feeds = isset($_POST['feeds']) && is_array($_POST['feeds']) ? wp_unslash($_POST['feeds']) : array();
+        $feeds = array();
+        $i = 0;
+        foreach ($raw_feeds as $rf) {
+            $i++;
+            $feeds[] = $this->mailercloud_build_feed($rf, $i);
+        }
+        update_option('mailercloud_connector_map_' . $slug, array('feeds' => $feeds), false);
+        wp_send_json_success(array('message' => 'saved'));
+    }
+
+    /**
+     * AJAX: delete one feed (form-mapping) from a connector by its id. Nonce + cap guarded.
+     */
+    public function mailercloud_delete_connector_feed()
+    {
+        check_ajax_referer('mailercloud_admin_ajax', '_ajax_nonce');
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'forbidden'), 403);
+        }
+        $allowed_slugs = array('cf7', 'wpforms', 'elementor', 'gravity', 'ninja', 'formidable');
+        $slug    = isset($_POST['slug']) ? sanitize_key(wp_unslash($_POST['slug'])) : '';
+        $feed_id = isset($_POST['feed_id']) ? substr(sanitize_text_field(wp_unslash($_POST['feed_id'])), 0, 40) : '';
+        if (! in_array($slug, $allowed_slugs, true) || $feed_id === '') {
+            wp_send_json_error(array('message' => 'invalid request'), 400);
+        }
+        $connector = $this->mailercloud_connector_by_slug($slug);
+        $remaining = array();
+        foreach (($connector ? $connector->get_feeds() : array()) as $f) {
+            if ((string) (isset($f['id']) ? $f['id'] : '') !== (string) $feed_id) {
+                $remaining[] = $f;
+            }
+        }
+        update_option('mailercloud_connector_map_' . $slug, array('feeds' => $remaining), false);
+        wp_send_json_success(array('message' => 'deleted'));
+    }
+
+    /**
+     * AJAX: return a form's fields for the mapping dropdowns.
+     * Returns { fields: [ { key, label }, ... ] }.
+     */
+    public function mailercloud_get_form_fields()
+    {
+        check_ajax_referer('mailercloud_admin_ajax', '_ajax_nonce');
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error(array('fields' => array()), 403);
+        }
+        $allowed_slugs = array('cf7', 'wpforms', 'elementor', 'gravity', 'ninja', 'formidable');
+        $slug    = isset($_POST['slug']) ? sanitize_key(wp_unslash($_POST['slug'])) : '';
+        $form_id = isset($_POST['form_id']) ? substr(sanitize_text_field(wp_unslash($_POST['form_id'])), 0, 64) : '';
+        if (! in_array($slug, $allowed_slugs, true) || $form_id === '') {
+            wp_send_json_error(array('fields' => array()), 400);
+        }
+        $loader = new Mc_Connectors_Loader();
+        $fields = array();
+        foreach ($loader->all() as $c) {
+            if ($c->slug() === $slug && $c->is_active()) {
+                $fields = $c->get_form_fields($form_id);
+                break;
+            }
+        }
+        wp_send_json(array('fields' => array_values($fields)));
+    }
+
+    /**
+     * AJAX: search MailerCloud lists for the searchable list dropdown (server-side search).
+     * Returns { results: [ { id, text }, ... ] }. Loads up to 100 per query.
+     */
+    public function mailercloud_search_lists()
+    {
+        check_ajax_referer('mailercloud_admin_ajax', '_ajax_nonce');
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error(array('results' => array()), 403);
+        }
+        $api_key = get_option('mailercloud_api_key');
+        $q = isset($_POST['q']) ? sanitize_text_field(wp_unslash($_POST['q'])) : '';
+        $results = array();
+        if ($api_key) {
+            $resp = callWpRemoteRestApi('POST', MAILERCLOUD_SUBSCRIBER_SYNC_API_URL, $api_key, wp_json_encode(array(
+                'limit' => 100, 'list_type' => 1, 'page' => 1, 'search_name' => $q, 'sort_field' => 'name', 'sort_order' => 'asc',
+            )));
+            if (! empty($resp['data'])) {
+                foreach ($resp['data'] as $l) {
+                    if (isset($l['id'])) {
+                        $results[] = array('id' => $l['id'], 'text' => isset($l['name']) ? $l['name'] : $l['id']);
+                    }
+                }
+            }
+        }
+        wp_send_json(array('results' => $results));
+    }
+
+    /**
+     * AJAX: search MailerCloud tags for the searchable tag dropdown (server-side search).
+     */
+    public function mailercloud_search_tags()
+    {
+        check_ajax_referer('mailercloud_admin_ajax', '_ajax_nonce');
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error(array('results' => array()), 403);
+        }
+        $api_key = get_option('mailercloud_api_key');
+        $q = isset($_POST['q']) ? sanitize_text_field(wp_unslash($_POST['q'])) : '';
+        $results = array();
+        if ($api_key) {
+            $resp = callWpRemoteRestApi('POST', MAILERCLOUD_TAG_LISTING_API_URL, $api_key, wp_json_encode(array(
+                'limit' => 100, 'page' => 1, 'search' => $q,
+            )));
+            if (! empty($resp['data'])) {
+                foreach ($resp['data'] as $t) {
+                    if (isset($t['id'])) {
+                        $results[] = array('id' => $t['id'], 'text' => isset($t['tag_name']) ? $t['tag_name'] : $t['id']);
+                    }
+                }
+            }
+        }
+        wp_send_json(array('results' => $results));
+    }
+
+    /**
+     * admin_notices: a one-time review-request nudge once the plugin has captured
+     * at least one lead, dismissible/snoozable. Gap #5 (review engine).
+     */
+    public function mailercloud_maybe_show_review_notice()
+    {
+        if (! current_user_can('manage_options')) {
+            return;
+        }
+        if (! class_exists('Mc_Analytics') || Mc_Analytics::total_captured() < 1) {
+            return;
+        }
+        $state = get_option('mailercloud_review_notice', array());
+        if (! is_array($state)) {
+            $state = array();
+        }
+        if (! empty($state['dismissed'])) {
+            return;
+        }
+        if (! empty($state['snooze_until']) && time() < intval($state['snooze_until'])) {
+            return;
+        }
+        $review_url = 'https://wordpress.org/support/plugin/mailercloud-integrate-webforms-synchronize-contacts/reviews/#new-post';
+        $nonce = wp_create_nonce('mailercloud_admin_ajax');
+        echo '<div class="notice notice-info is-dismissible" id="mailercloud-review-notice" data-nonce="' . esc_attr($nonce) . '">';
+        echo '<p>' . esc_html__('Mailercloud has started capturing leads from your forms. If it is helping, a quick 5-star review would mean a lot.', 'mailercloud') . ' ';
+        echo '<a href="' . esc_url($review_url) . '" target="_blank" rel="noopener" class="button button-primary" id="mailercloud-review-now">' . esc_html__('Leave a review', 'mailercloud') . '</a> ';
+        echo '<a href="#" id="mailercloud-review-later">' . esc_html__('Maybe later', 'mailercloud') . '</a></p>';
+        echo '</div>';
+
+        $ajax_url = admin_url('admin-ajax.php');
+        $inline = "(function(){var n=document.getElementById('mailercloud-review-notice');if(!n)return;"
+            . "var nonce=n.getAttribute('data-nonce');"
+            . "function send(mode){var b=new URLSearchParams();b.append('action','mailercloud_dismiss_review');b.append('mode',mode);b.append('_ajax_nonce',nonce);"
+            . "fetch(" . wp_json_encode($ajax_url) . ",{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:b.toString()});}"
+            . "var later=document.getElementById('mailercloud-review-later');if(later){later.addEventListener('click',function(e){e.preventDefault();send('later');n.style.display='none';});}"
+            . "n.addEventListener('click',function(e){if(e.target&&e.target.classList&&e.target.classList.contains('notice-dismiss')){send('dismiss');}});"
+            . "var now=document.getElementById('mailercloud-review-now');if(now){now.addEventListener('click',function(){send('dismiss');});}})();";
+        echo '<script>' . $inline . '</script>';
+    }
+
+    /**
+     * AJAX: record review-notice dismissal/snooze.
+     */
+    public function mailercloud_dismiss_review()
+    {
+        check_ajax_referer('mailercloud_admin_ajax', '_ajax_nonce');
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'forbidden'), 403);
+        }
+        $mode = isset($_POST['mode']) ? sanitize_key(wp_unslash($_POST['mode'])) : 'dismiss';
+        if ($mode === 'later') {
+            update_option('mailercloud_review_notice', array('snooze_until' => time() + (14 * DAY_IN_SECONDS)), false);
+        } else {
+            update_option('mailercloud_review_notice', array('dismissed' => true), false);
+        }
+        wp_send_json_success();
     }
     
 
@@ -297,33 +779,34 @@ class Mailercloud
         if (!current_user_can('manage_options')) {
             wp_send_json_error(array('message' => 'forbidden'), 403);
         }
-        $response =[];
-        if (isset($_POST['name'])) {
-            if (get_option('mailercloud_api_key')) {
-                $api_key = get_option('mailercloud_api_key');
-                $this->mailercloud_api_key = $api_key;
+        $response = array();
+        $api_key  = get_option('mailercloud_api_key');
+        if (isset($_POST['name']) && $api_key) {
+            $this->mailercloud_api_key = $api_key;
+            // Field type is constrained to the options the UI offers.
+            $allowed_types = array('text', 'number', 'textarea', 'date');
+            $type = sanitize_text_field(wp_unslash(isset($_POST['type']) ? $_POST['type'] : ''));
+            if (! in_array($type, $allowed_types, true)) {
+                $type = 'text';
             }
-            if ($api_key) {
-                $data = array(
-                    'description' =>sanitize_text_field($_POST['description']),
-                    'name' => sanitize_text_field($_POST['name']),
-                    'type' => sanitize_text_field($_POST['type']),
-                );
-                $response= callWpRemoteRestApi(
-                    'POST',
-                    MAILERCLOUD_CREATE_NEW_PROPERTY_API_URL,
-                    $api_key,
-                    json_encode($data)
-                );
-                if (isset($response['id'])) {
-                    $response['name'] =sanitize_text_field($_POST['name']);
-                    $response['message'] ='new property is created successfully.';
-                } else {
-                }
+            $name = sanitize_text_field(wp_unslash($_POST['name']));
+            $data = array(
+                'description' => sanitize_text_field(wp_unslash(isset($_POST['description']) ? $_POST['description'] : '')),
+                'name'        => $name,
+                'type'        => $type,
+            );
+            $response = callWpRemoteRestApi(
+                'POST',
+                MAILERCLOUD_CREATE_NEW_PROPERTY_API_URL,
+                $api_key,
+                wp_json_encode($data)
+            );
+            if (isset($response['id'])) {
+                $response['name']    = $name;
+                $response['message'] = __('New property created successfully.', 'mailercloud');
             }
         }
-        echo json_encode($response);
-        die();
+        wp_send_json($response);
     }
 
     public function mailercloud_sync_contacts_now_ajax()
@@ -489,10 +972,10 @@ class Mailercloud
         if (! wp_next_scheduled('mailercloud_cron_every_five_minutes')) {
             wp_schedule_event(time(), 'every_five_minutes', 'mailercloud_cron_every_five_minutes');
         }
-        if (get_option('mailercloud_api_key')) {
-            update_option('mailercloud_api_key', '');
-            update_option('mailercloud_selected_sync_list_id', '');
-        }
+        // NOTE: do NOT clear the saved API key / list on activation. Plugin updates don't
+        // run activation, but a manual deactivate->reactivate previously wiped the stored
+        // credentials, silently breaking sync until re-entered. Disconnect is handled
+        // explicitly by the logout action instead.
         $file = $this->mailercloud_get_plugin_path() . '/assets/json_files/attribute_mapping.json';
         if ($file) {
             if (file_put_contents($file, json_encode($this->default_mapping_array))) {
@@ -526,6 +1009,7 @@ class Mailercloud
         $user_email = $user_info->user_email;
         $user = getwordpressUserAttributes($user_id);
         $api_key='';
+        $list_id = '';
         $attribute_mapping_arr=[];
         if (get_option('mailercloud_selected_sync_list_id')) {
             $mailercloud_selected_sync_list_id = get_option('mailercloud_selected_sync_list_id');
@@ -645,7 +1129,7 @@ class Mailercloud
                     }
                     $response= callWpRemoteRestApi(
                         'PUT',
-                        MAILERCLOUD_SUBSCRIBER_SYNC_SINGLE_CONTACT_UPDATE_API_URL . $user_email,
+                        MAILERCLOUD_SUBSCRIBER_SYNC_SINGLE_CONTACT_UPDATE_API_URL . rawurlencode($user_email),
                         $api_key,
                         json_encode($contact_data)
                     );
@@ -666,6 +1150,15 @@ class Mailercloud
      * sync_contact_every_five_minutes_event
      *Hook into that action that'll fire every five minutes
      * @return void
+     */
+    /**
+     * Recurring background re-sync of subscribers.
+     *
+     * DORMANT: this is not active under standard WP-Cron (the constructor returns
+     * early on DOING_CRON before the hook is registered — see the note next to the
+     * add_action in __construct). Kept intact for a future, planned redesign into a
+     * DAILY, changed-only safety re-sync. Real-time sync (user_register /
+     * profile_update) and the manual "Sync My Users" button cover current needs.
      */
     public function sync_contact_every_five_minutes_event()
     {

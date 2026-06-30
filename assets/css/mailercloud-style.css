@@ -634,3 +634,126 @@ button#new_property:hover{background: #16DB93 !important;
     }
     
 }
+/* ===== Integrations page — reuses the Contact Sync card design ===== */
+.mc-int-wrap .mc-int-intro { font-size:15px; color:#50575e; max-width:860px; margin:0 0 18px; }
+.mc-int-card { background:#fff; padding:22px 30px; box-shadow:0 0 15px rgba(0,0,0,.05); margin-bottom:20px; box-sizing:border-box; max-width:860px; }
+.mc-int-card.mc-not-installed { opacity:.7; }
+.mc-int-head { display:flex; align-items:center; justify-content:space-between; }
+.mc-int-card.mc-active .mc-int-head { cursor:pointer; }
+.mc-int-head h2 { font-size:20px; font-weight:600; margin:0; display:flex; align-items:center; gap:10px; }
+.mc-int-card .mc-badge { font-size:11px; font-weight:600; border-radius:9px; padding:2px 10px; line-height:1.6; }
+.mc-int-caret { color:#646970; }
+.mc-int-body { margin-top:18px; border-top:1px solid #f0f0f1; padding-top:18px; }
+.mc-int-body .mc-field-block { margin-bottom:20px; }
+.mc-int-body .mc-field-block > label, .mc-int-body .mc-field-block > h3 { display:block; font-size:15px; font-weight:600; margin:0 0 8px; padding:0; }
+.mc-int-body .mc-desc { color:#646970; font-size:13px; margin:0 0 10px; }
+.mc-int-wrap .input-group.repeat_div { display:flex; align-items:center; }
+.mc-int-wrap .word_divs input[type=text] { width:100%; height:40px; border:1px solid #ddd; border-radius:3px; padding:0 10px; box-sizing:border-box; }
+.mc-int-wrap .action_btns .mc-remove-row { display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px; border:1px solid #d63638; color:#d63638; background:transparent; border-radius:3px; text-decoration:none; cursor:pointer; }
+.mc-int-wrap .action_btns .mc-remove-row:hover { background:#d63638; color:#fff; }
+.mc-int-wrap input.button.mc-save-connector { background:#046DFF !important; border:1px solid #046DFF; color:#fff !important; font-size:15px; text-transform:capitalize; padding:5px 22px; border-radius:3px; cursor:pointer; width:auto; }
+.mc-int-wrap input.button.mc-save-connector:hover { background:#0353a4 !important; border-color:#0353a4; }
+
+/* Fix: the Contact Sync ".subs-p form" card rule (width:58%; float:left) must NOT
+   apply to connector forms — the card is .mc-int-card; the form is plain + full width. */
+.mc-int-wrap .mc-connector-form {
+    width: 100% !important;
+    float: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+}
+.mc-int-body { overflow: hidden; }
+
+/* Mapping row buttons — match the Contact Sync green "+" / red "-" squares, full border. */
+.mc-int-wrap .input-group.repeat_div { display:flex; gap:10px; align-items:center; }
+.mc-int-wrap .input-group.repeat_div .word_divs { flex:1; width:auto; margin-right:0; }
+.mc-int-wrap .action_btns { flex:0 0 44px; width:44px; text-align:left; padding:0; }
+.mc-int-wrap .action_btns .mc-add-row,
+.mc-int-wrap .action_btns .mc-remove-row {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:40px; height:40px; border-radius:3px; background:transparent;
+    font-size:22px; line-height:1; text-decoration:none; cursor:pointer;
+    box-sizing:border-box; transition:all .3s ease;
+}
+.mc-int-wrap .action_btns .mc-add-row { border:1px solid #16DB93; color:#16DB93; }
+.mc-int-wrap .action_btns .mc-add-row:hover { background:#16DB93 !important; color:#fff; }
+.mc-int-wrap .action_btns .mc-remove-row { border:1px solid #d63638; color:#d63638; font-size:20px; }
+.mc-int-wrap .action_btns .mc-remove-row:hover { background:#d63638 !important; color:#fff; }
+.mc-int-wrap .mc-tagdrop .dropdown-content { width:45%; min-width:280px; }
+
+/* Dropdown search box + clickable single-select list options (List & Tags). */
+.mc-int-wrap .dropdown-content { max-height:none; overflow:visible; }
+.mc-int-wrap .mc-drop-search { width:100%; box-sizing:border-box; height:34px; border:1px solid #ddd; border-radius:3px; padding:0 10px; margin-bottom:8px; }
+.mc-int-wrap .mc-drop-options { max-height:210px; overflow-y:auto; }
+.mc-int-wrap .mc-list-opt { display:block; padding:6px 10px; margin:2px 0; cursor:pointer; border-radius:4px; line-height:1.5; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mc-int-wrap .mc-list-opt:hover { background:#f1f1f1; }
+.mc-int-wrap .mc-list-opt.active { background:#e7f3ff; font-weight:600; }
+.mc-int-wrap .mc-drop-options .mc-empty { color:#888; padding:6px 10px; font-style:italic; }
+
+/* Open the List/Tags dropdown BELOW the button (not above). */
+.mc-int-wrap .mc-dropdown { position:relative; }
+.mc-int-wrap .dropdown-content { top:100%; bottom:auto; left:0; margin-top:4px; }
+
+/* Validation border via class — applied to the specific missing field, cleared on interaction. */
+.mc-int-wrap .mc-field-key.mc-error-field,
+.mc-int-wrap .mc-dropdown-btn.mc-error-field { border:1px solid #d63638 !important; box-shadow:none !important; }
+/* Let the List/Tags dropdowns extend beyond the card (don't clip) and sit above sibling cards. */
+.mc-int-wrap .mc-int-body { overflow:visible; }
+.mc-int-wrap .dropdown-content { z-index:1000; }
+
+/* Create New Property — dashed button + modal form fields (matches the Contact Sync flow). */
+.mc-int-wrap .mc-new-prop-wrap { margin-top:14px; }
+.mc-int-wrap a.mc-new-property { display:block; width:100%; box-sizing:border-box; text-align:center; padding:10px; border:1px dashed #16DB93; color:#16DB93; background:#fff; border-radius:3px; text-decoration:none; font-weight:600; transition:all .3s ease; }
+.mc-int-wrap a.mc-new-property:hover { background:#16DB93; color:#fff; }
+.mc-int-wrap .mc-prop-form input[type=text], .mc-int-wrap .mc-prop-form select { width:100%; height:40px; border:1px solid #ddd; border-radius:3px; box-sizing:border-box; margin:4px 0 12px; padding:0 10px; }
+.mc-int-wrap .mc-prop-form label { font-weight:600; font-size:14px; }
+.mc-int-wrap .mc-prop-form input.button.mc-prop-create { background:#046DFF !important; border:1px solid #046DFF; color:#fff !important; padding:6px 22px; border-radius:3px; cursor:pointer; text-transform:capitalize; width:auto; height:auto; }
+
+/* Fix: don't let the ".subs-p form" card rule break the Create-Property modal form. */
+.mc-int-wrap .mc-prop-form { width:100% !important; float:none !important; background:transparent !important; padding:0 !important; box-shadow:none !important; margin:0 !important; }
+
+/* Create-property modal — consistent comfortable width (reads the same on any screen). */
+.mc-int-wrap #mc-int-prop-modal .mailer_popup { width:30%; min-width:480px; max-width:600px; }
+
+/* Make all three modal fields the same full width (override .subs-p form select{width:300px}). */
+.mc-int-wrap .mc-prop-form input[type=text], .mc-int-wrap .mc-prop-form select { width:100% !important; max-width:100%; }
+
+/* ===== Integrations list view: clickable connector cards ===== */
+.mc-int-wrap a.mc-int-card-link { display:block; text-decoration:none; color:inherit; cursor:pointer; transition:box-shadow .15s ease; }
+.mc-int-wrap a.mc-int-card-link:hover { box-shadow:0 0 18px rgba(0,0,0,.10); }
+.mc-int-wrap a.mc-int-card-link .mc-int-head { cursor:pointer; }
+.mc-int-wrap a.mc-int-card-link .mc-int-caret,
+.mc-int-wrap .mc-int-card .mc-int-caret { color:#646970; }
+
+/* ===== Integrations config view ===== */
+.mc-int-wrap .mc-int-back { margin:0 0 6px; }
+.mc-int-wrap .mc-int-back a { text-decoration:none; }
+.mc-int-wrap .mc-config-card { max-width:860px; }
+
+/* Feed = one collapsible form-mapping */
+.mc-int-wrap .mc-feed { border:1px solid #e2e4e7; border-radius:4px; margin-bottom:16px; background:#fff; }
+.mc-int-wrap .mc-feed-head { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; cursor:pointer; }
+.mc-int-wrap .mc-feed-body .mc-feed-title,
+.mc-int-wrap .mc-feed-title { font-size:15px; font-weight:600; }
+.mc-int-wrap .mc-feed-head-right { display:flex; align-items:center; gap:14px; }
+.mc-int-wrap .mc-feed-enable { font-weight:400; font-size:13px; cursor:pointer; white-space:nowrap; }
+.mc-int-wrap a.mc-remove-feed { color:#d63638; text-decoration:none; font-size:13px; }
+.mc-int-wrap a.mc-remove-feed:hover { text-decoration:underline; }
+.mc-int-wrap .mc-feed-caret { color:#646970; }
+.mc-int-wrap .mc-feed-body { padding:4px 16px 16px; border-top:1px solid #f0f0f1; }
+.mc-int-wrap a.button.mc-add-feed { border-style:dashed; }
+
+/* Per-feed Save area (inside the feed toggle) */
+.mc-int-wrap .mc-feed-save { margin-top:18px; padding-top:14px; border-top:1px solid #f0f0f1; }
+.mc-int-wrap .mc-feed-save .mc-save-feedback { margin-bottom:10px; }
+.mc-int-wrap a.button.mc-save-feed { background:#046DFF !important; border:1px solid #046DFF; color:#fff !important; font-size:14px; text-transform:capitalize; padding:6px 22px; border-radius:3px; cursor:pointer; text-decoration:none; }
+.mc-int-wrap a.button.mc-save-feed:hover { background:#0353a4 !important; border-color:#0353a4; }
+
+/* Empty state when a connector has no form mappings */
+.mc-int-wrap .mc-feeds-empty { color:#646970; font-size:14px; background:#fff; border:1px dashed #ccd0d4; border-radius:4px; padding:18px; text-align:center; margin:0 0 16px; }
+
+/* Loader scoped to the config card (centres over the mapping area, not the viewport) */
+.mc-int-wrap .mc-config-card { position: relative; }
+.mc-int-wrap .mc-card-loader { position: absolute; background: rgba(255,255,255,0.65); border-radius: 4px; }

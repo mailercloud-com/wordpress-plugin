@@ -1,5 +1,10 @@
 jQuery(document).ready(function($) {
 
+    // Escape any value before injecting it into .html() — API error fields (field/message)
+    // are server-controlled and must not be rendered as raw HTML in the admin (XSS).
+    function mcEsc(s) {
+        return $('<div>').text(s === undefined || s === null ? '' : String(s)).html();
+    }
 
     $(document).on('click ', '.add_line', function(e) {
 
@@ -468,7 +473,7 @@ jQuery(document).ready(function($) {
 
                     .addClass('success')
 
-                    .html("<p><b>" + response.message + "</b></p>");
+                    .html("<p><b>" + mcEsc(response.message) + "</b></p>");
 
                     setTimeout(function() {
 
@@ -484,7 +489,7 @@ jQuery(document).ready(function($) {
 
                         .addClass('error')
 
-                        .html("<p><b>" + value.field + '</b>:  ' + value.message + "</p>");
+                        .html("<p><b>" + mcEsc(value.field) + '</b>:  ' + mcEsc(value.message) + "</p>");
                     });
 
                 }
@@ -568,22 +573,22 @@ jQuery(document).ready(function($) {
 
                             .addClass('error')
 
-                            .html("<p><b>" + value.field + '</b>:  ' + value.message + "</p>");
+                            .html("<p><b>" + mcEsc(value.field) + '</b>:  ' + mcEsc(value.message) + "</p>");
                         });
 
                     } else if (response.data) {
 
                         var textmsg = '';
 
-                        textmsg += '<p><b>' + response.message + '</b></p>';
+                        textmsg += '<p><b>' + mcEsc(response.message) + '</b></p>';
 
-                        textmsg += '<p><span> Total Contacts Inserted  </span>' + response.data['inserted'] + '</p>';
+                        textmsg += '<p><span> Total Contacts Inserted  </span>' + mcEsc(response.data['inserted']) + '</p>';
 
-                        textmsg += '<p><span>Total Contacts Skipped  </span>' + response.data['skipped'] + '</p>';
+                        textmsg += '<p><span>Total Contacts Skipped  </span>' + mcEsc(response.data['skipped']) + '</p>';
 
-                        textmsg += '<p><span>Total Contacts Submitted  </span>' + response.data['submitted'] + '</p>';
+                        textmsg += '<p><span>Total Contacts Submitted  </span>' + mcEsc(response.data['submitted']) + '</p>';
 
-                        textmsg += '<p><span>Total Updated Contacts  </span>' + response.data['updated'] + '</p>';
+                        textmsg += '<p><span>Total Updated Contacts  </span>' + mcEsc(response.data['updated']) + '</p>';
 
                         $('#sync_feedback')
 
@@ -598,7 +603,7 @@ jQuery(document).ready(function($) {
 
                         .addClass('error')
 
-                        .html("<p><b>" + response.message + "</b></p>");
+                        .html("<p><b>" + mcEsc(response.message) + "</b></p>");
                     } else {
 
                         $.each(response.errors, function(key, value) {
@@ -607,7 +612,7 @@ jQuery(document).ready(function($) {
 
                             .addClass('error')
 
-                            .html("<p><b>" + value.field + '</b>:  ' + value.message + "</p>");
+                            .html("<p><b>" + mcEsc(value.field) + '</b>:  ' + mcEsc(value.message) + "</p>");
 
                         });
 

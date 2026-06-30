@@ -1,12 +1,57 @@
 <?php
     /**
+     * Log a Mailercloud API failure to the site's debug log (only when WP_DEBUG is on).
+     *
+     * Replaces the old behaviour of opening a /v1/ticket on every failure, which fired a
+     * second blocking HTTP call on each error and amplified load during API incidents.
+     * Team-side alerting (Slack with trace) is handled SERVER-SIDE on the Mailercloud API,
+     * never from this client-distributed plugin.
+     *
+     * @param string $method
+     * @param string $url
+     * @param mixed  $body
+     * @param mixed  $response WP_Error or the wp_remote_* response array.
+     * @return void
+     *
+     * @note The request body may contain subscriber PII (email/name). It is logged only
+     *       when WP_DEBUG is on, to the site's own debug.log — do not leave WP_DEBUG
+     *       enabled on a production site. The API key is sent in the Authorization header
+     *       and is never passed to this function, so it is never logged.
+     */
+    function mc_log_api_error($method, $url, $body, $response)
+    {
+        if (! (defined('WP_DEBUG') && WP_DEBUG)) {
+            return;
+        }
+        if (is_wp_error($response)) {
+            $detail = $response->get_error_message();
+        } elseif (is_array($response) && isset($response['body'])) {
+            $detail = $response['body'];
+        } else {
+            $detail = wp_json_encode($response);
+        }
+        $resp_str = is_string($detail) ? $detail : wp_json_encode($detail);
+        $req_str  = is_string($body) ? $body : wp_json_encode($body);
+        // Strip CR/LF so a crafted API message cannot inject extra lines into the log.
+        $resp_str = str_replace(array("\r", "\n"), ' ', (string) $resp_str);
+        $req_str  = str_replace(array("\r", "\n"), ' ', (string) $req_str);
+        error_log(sprintf(
+            '[Mailercloud] API error: %s %s | response: %s | request: %s',
+            $method,
+            $url,
+            $resp_str,
+            $req_str
+        ));
+    }
+
+    /**
      * callWpRemoteRestApi
      *
      * @param  mixed $method
      * @param  mixed $url
      * @param  mixed $api_key
      * @param  mixed $body
-     * @return void
+     * @return array  { status:0|1, message, and one of data|id|errors }
      */
     function callWpRemoteRestApi($method, $url, $api_key, $body = false)
     {
@@ -26,6 +71,7 @@
                     'Authorization' => $api_key
                 ],
                 'data_format' => 'body',
+                'timeout'     => 15,
             ];
             $response = wp_remote_post($url, $options);
         } elseif ($method =="PUT") {
@@ -36,6 +82,7 @@
                     'Authorization' => $api_key
                 ],
                 'method' => 'PUT',
+                'timeout' => 15,
             ];
             $response = wp_remote_request($url, $options);
         } else {
@@ -43,55 +90,22 @@
             'headers' => [
                 'Content-Type' => 'application/json',
                 'Authorization' => $api_key
-            ]
+            ],
+            'timeout' => 15,
         );
             $response =wp_remote_get($url, $args);
         }
-        if (is_array($response) && is_wp_error($response)) {
-            $message = __('Sorry We are not Verify APi Key, Please try again.', 'mailercloud');
-        } elseif (is_wp_error($response)) {
-            echo '<br><div style="color: #a94442;
-                background-color: #f2dede;
-                border-color: #ebccd1;
-                padding: 15px;
-                margin-bottom: 20px;
-                border: 1px solid transparent;
-                border-radius: 4px;
-                float:left;
-                width: 100%">Sync Error : Your Mailercloud data will not load</div>';
-            $errors = "response not loaded issue";
-            $descriptionArray =[
-            	'method' => $method,
-            	'request' =>$body,
-            	'response' => $response,
+        if (is_wp_error($response)) {
+            // Transport failure (timeout/DNS/SSL). Log the trace for the site owner and
+            // surface a clean error to the caller. We no longer open a /v1/ticket here —
+            // that fired a second blocking call per failure and amplified load during
+            // incidents; team alerting is handled server-side on the Mailercloud API.
+            mc_log_api_error($method, $url, $body, $response);
+            return [
+                'message' => __('Could not reach Mailercloud. Please try again.', 'mailercloud'),
+                'status'  => 0,
+                'errors'  => $response->get_error_message(),
             ];
-            /** ticket creation api **/
-            $title = 'Api url :'.$url;
-            $dataTicket = [
-            	'title' 	   => $title,
-            	'description'  => json_encode($descriptionArray),
-                'status' => 500,
-            ];
-                       
-            $optionsTicket = [
-            	'body'        => json_encode($dataTicket),
-            	'headers'     => [
-                	'Content-Type' => 'application/json',
-            	    'Authorization' => $api_key
-            	],
-            	'data_format' => 'body',
-            ];
-            $responseTicket = wp_remote_post(MAILERCLOUD_TICKET_CREATION_API_URL, $optionsTicket);
-            if (is_array($responseTicket) && is_wp_error($responseTicket)) {
-                $message = __('Sorry error occured, Please try again.', 'mailercloud');
-            }
-            /** end of ticket creation api **/
-            $response =[
-                'message' => $message,
-                'status' => $status,
-                'errors' => $errors
-            ];
-            return $response;
         } else {
             $bodyData = json_decode($response['body'], true);
             if (!isset($bodyData['data'])) {
@@ -103,43 +117,24 @@
                         'id' => $id
                     ];
                     return $response;
-                } elseif (isset($bodyData['errors'])) {
-                    $errors =isset($bodyData['errors'])?$bodyData['errors']:[];
-					$descriptionArray =[
-					'method' => $method,
-					'request' =>$body,
-					'response' =>$bodyData,
-					];
-					/** ticket creation api **/
-					$title = 'Api url :'.$url;
-					$dataTicket = [
-					'title' 	   => $title,
-					'description'  => json_encode($descriptionArray)
-					];
-					
-					 $optionsTicket = [
-						'body'        => json_encode($dataTicket),
-						'headers'     => [
-							'Content-Type' => 'application/json',
-							'Authorization' => $api_key
-						],
-						'data_format' => 'body',
-					];
-					$responseTicket = wp_remote_post(MAILERCLOUD_TICKET_CREATION_API_URL, $optionsTicket);
-					 if (is_array($responseTicket) && is_wp_error($responseTicket)) {
-						$message = __('Sorry error occured, Please try again.', 'mailercloud');
-					} else {
-						$bodyDataTicket = json_decode($responseTicket['body'], true);
-					}
-					/** end of ticket creation api **/
-                    $response =[
-                        'message' => $message,
-                        'status' => $status,
-                        'errors' => $errors
+                } elseif (isset($bodyData['contact_id'])) {
+                    // /v1/contacts/upsert returns {contact_id, status:"created"|"updated"} (no "id").
+                    $response = [
+                        'message' => isset($bodyData['status']) ? $bodyData['status'] : '',
+                        'status' => 1,
+                        'id' => $bodyData['contact_id'],
+                        'contact_id' => $bodyData['contact_id'],
                     ];
-					
-					
                     return $response;
+                } elseif (isset($bodyData['errors'])) {
+                    // API rejected the request. Return the errors to the caller (so the admin
+                    // UI can show them) and log the trace. No /v1/ticket call (removed).
+                    mc_log_api_error($method, $url, $body, $response);
+                    return [
+                        'message' => __('Mailercloud returned an error.', 'mailercloud'),
+                        'status'  => 0,
+                        'errors'  => $bodyData['errors'],
+                    ];
                 } elseif (isset($bodyData['message'])) {
                     $message =$bodyData['message'];
                     $status = 1;
@@ -158,33 +153,6 @@
             'data' => $data
         ];
         return $response;
-    }
-    
-    /**
-     * get_users_by_role
-     *
-     * @param  mixed $role
-     * @param  mixed $orderby
-     * @param  mixed $order
-     * @return void
-     */
-    function get_users_by_role($role, $orderby, $order)
-    {
-        $args = array(
-            //'role__in'     => array('administrator', 'editor', 'author','subscriber'),
-            'orderby' => $orderby,
-            'order' => $order
-        );
-        $users =[];
-        $userAll = get_users($args);
-        foreach ($userAll as $user) {
-            $UserData = get_user_meta($user->ID);
-            $updated= isset($UserData['mailercloud_is_synched'][0])?$UserData['mailercloud_is_synched'][0]:'';
-            //if( $updated ==''){
-            $users[] = getwordpressUserAttributes($user->ID);
-            // }
-        }
-        return $users;
     }
     
     /**
