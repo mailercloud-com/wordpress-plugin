@@ -3,7 +3,7 @@ Tags: contact form 7, wpforms, elementor forms, gravity forms, email marketing, 
 Contributors: Mailercloud
 Donate link:
 Requires at least: 4.0
-Tested up to: 6.9.4
+Tested up to: 7.0
 Requires PHP: 7.2.5
 Stable tag: 1.1.0
 License: GPLv2 or later

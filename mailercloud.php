@@ -113,6 +113,8 @@ class Mailercloud
             array($this, "mailercloud_sync_contacts_now_ajax")
         );
         add_action("wp_ajax_mailercloud_save_connector_map", array($this, "mailercloud_save_connector_map"));
+        add_action("wp_ajax_mailercloud_delete_connector_feed", array($this, "mailercloud_delete_connector_feed"));
+        add_action("wp_ajax_mailercloud_get_form_fields", array($this, "mailercloud_get_form_fields"));
         add_action("wp_ajax_mailercloud_search_lists", array($this, "mailercloud_search_lists"));
         add_action("wp_ajax_mailercloud_search_tags", array($this, "mailercloud_search_tags"));
         add_action("wp_ajax_mailercloud_dismiss_review", array($this, "mailercloud_dismiss_review"));
@@ -230,7 +232,7 @@ class Mailercloud
         wp_register_script(
             'mailercloud-integrations',
             plugins_url('assets/js/mailercloud-integrations.js', __FILE__),
-            array('jquery', 'mailercloud-admin-script'),
+            array('jquery', 'mailercloud-admin-script', 'mailercloud-sweetalert'),
             @filemtime($this->mailercloud_get_plugin_path() . '/assets/js/mailercloud-integrations.js') ?: $this->version,
             true
         );
@@ -327,8 +329,8 @@ class Mailercloud
         );
         add_submenu_page(
             'mailercloud-settings-page',
-            __('Contact Sync', 'mailercloud'),
-            __('Contact Sync', 'mailercloud'),
+            __('Contact Map', 'mailercloud'),
+            __('Contact Map', 'mailercloud'),
             'manage_options',
             'mailercloud-subscriber-synchronisation',
             array($this, 'create_mailercloud_synchronisation_settings_page')
@@ -417,8 +419,39 @@ class Mailercloud
         $api_key = get_option('mailercloud_api_key');
         $loader = new Mc_Connectors_Loader();
         $connectors = $loader->all();
-        list($lists, $custom_fields, $tags) = $this->mailercloud_fetch_mc_meta();
         $mc_connector_nonce = wp_create_nonce('mailercloud_admin_ajax');
+
+        // Two views: the connectors list, and a per-connector configure page.
+        // Clicking a connector on the list goes to ?page=mailercloud-integrations&connector=<slug>.
+        $sel = isset($_GET['connector']) ? sanitize_key(wp_unslash($_GET['connector'])) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $mc_connector = null;
+        foreach ($connectors as $c) {
+            if ($c->slug() === $sel && $c->is_active()) {
+                $mc_connector = $c;
+                break;
+            }
+        }
+        $mc_view          = $mc_connector ? 'config' : 'list';
+        $lists            = array();
+        $custom_fields    = array();
+        $tags             = array();
+        $connector_forms  = array();
+        $connector_fields = array();
+
+        // Only the configure page needs the Mailercloud meta + form fields (avoids API calls on the list).
+        if ($mc_view === 'config') {
+            list($lists, $custom_fields, $tags) = $this->mailercloud_fetch_mc_meta();
+            $slug = $mc_connector->slug();
+            $connector_forms[$slug] = $mc_connector->get_forms();
+            $fields_by_form = array();
+            foreach ($mc_connector->get_feeds() as $feed) {
+                $fid = isset($feed['form_id']) ? (string) $feed['form_id'] : '';
+                if ($fid !== '' && ! isset($fields_by_form[$fid])) {
+                    $fields_by_form[$fid] = $mc_connector->get_form_fields($fid);
+                }
+            }
+            $connector_fields[$slug] = $fields_by_form;
+        }
         require_once $this->mailercloud_get_plugin_path() . '/templates/mailercloud-integrations.php';
     }
 
@@ -440,30 +473,36 @@ class Mailercloud
         require_once $this->mailercloud_get_plugin_path() . '/templates/mailercloud-analytics.php';
     }
 
-    /**
-     * AJAX: save a connector's mapping config. Same nonce + capability guard as
-     * the other admin AJAX handlers (LIVE-741 model).
-     */
-    public function mailercloud_save_connector_map()
+    /** @return Mc_Connector_Base|null the connector for a slug (for reading its feeds). */
+    private function mailercloud_connector_by_slug($slug)
     {
-        check_ajax_referer('mailercloud_admin_ajax', '_ajax_nonce');
-        if (! current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => 'forbidden'), 403);
+        $loader = new Mc_Connectors_Loader();
+        foreach ($loader->all() as $c) {
+            if ($c->slug() === $slug) {
+                return $c;
+            }
         }
+        return null;
+    }
 
-        $allowed_slugs = array('cf7', 'wpforms', 'elementor', 'gravity', 'ninja', 'formidable');
-        $slug = isset($_POST['slug']) ? sanitize_key(wp_unslash($_POST['slug'])) : '';
-        if (! in_array($slug, $allowed_slugs, true)) {
-            wp_send_json_error(array('message' => 'invalid connector'), 400);
-        }
-
-        $enabled = ! empty($_POST['enabled']);
-        // List/tag ids are short alphanumeric tokens (e.g. "wKKwyf"); keep as string, just bound length.
-        $list_id = isset($_POST['list_id']) ? substr(sanitize_text_field(wp_unslash($_POST['list_id'])), 0, 64) : '';
+    /**
+     * Sanitize + validate one raw POST feed into a stored feed. On validation failure
+     * for an enabled feed this sends a JSON error and exits.
+     *
+     * @param array $rf        raw feed (already wp_unslash'd)
+     * @param int   $label_num number shown in validation messages
+     * @return array { id, enabled, form_id, list_id, mapping[] }
+     */
+    private function mailercloud_build_feed($rf, $label_num)
+    {
+        $enabled = ! empty($rf['enabled']);
+        $list_id = isset($rf['list_id']) ? substr(sanitize_text_field($rf['list_id']), 0, 64) : '';
+        $form_id = isset($rf['form_id']) ? substr(sanitize_text_field($rf['form_id']), 0, 64) : '';
+        $feed_id = isset($rf['id']) ? substr(sanitize_text_field($rf['id']), 0, 40) : '';
 
         $mapping = array();
-        if (! empty($_POST['mapping']) && is_array($_POST['mapping'])) {
-            foreach (wp_unslash($_POST['mapping']) as $pair) {
+        if (! empty($rf['mapping']) && is_array($rf['mapping'])) {
+            foreach ($rf['mapping'] as $pair) {
                 if (! isset($pair['field_key'], $pair['mc_attr'])) {
                     continue;
                 }
@@ -472,7 +511,6 @@ class Mailercloud
                 if ($field_key === '' || $mc_attr === '') {
                     continue;
                 }
-                // Whitelist destinations: standard fields or custom_fields_<id>.
                 if (! in_array($mc_attr, array('email', 'name', 'last_name'), true)
                     && ! preg_match('/^custom_fields_[A-Za-z0-9_-]+$/', $mc_attr)) {
                     continue;
@@ -480,17 +518,14 @@ class Mailercloud
                 $mapping[] = array('wordpress_attribute' => $field_key, 'mailercloud_attribute' => $mc_attr);
             }
         }
-
-        // Tags are stored as NAMES (the contacts/upsert API matches tags by name, not id).
-        if (! empty($_POST['tags']) && is_array($_POST['tags'])) {
-            $tag_names = array_values(array_filter(array_map('sanitize_text_field', wp_unslash($_POST['tags']))));
+        // Tags stored as NAMES (the contacts/upsert API matches tags by name).
+        if (! empty($rf['tags']) && is_array($rf['tags'])) {
+            $tag_names = array_values(array_filter(array_map('sanitize_text_field', $rf['tags'])));
             if (! empty($tag_names)) {
                 $mapping[] = array('wordpress_attribute' => 'tags', 'mailercloud_attribute' => wp_json_encode($tag_names));
             }
         }
 
-        // Email is mandatory in MailerCloud — an enabled connector must map a field to Email
-        // and choose a list. (A disabled connector can be saved incomplete.)
         if ($enabled) {
             $has_email = false;
             foreach ($mapping as $m) {
@@ -500,20 +535,125 @@ class Mailercloud
                 }
             }
             if (! $has_email) {
-                wp_send_json_error(array('message' => __('Map a form field to Email — it is required.', 'mailercloud')), 400);
+                /* translators: %d: form-mapping number */
+                wp_send_json_error(array('message' => sprintf(__('Form mapping #%d: map a form field to Email — it is required.', 'mailercloud'), $label_num)), 400);
             }
             if (empty($list_id)) {
-                wp_send_json_error(array('message' => __('Choose a list to add contacts to.', 'mailercloud')), 400);
+                /* translators: %d: form-mapping number */
+                wp_send_json_error(array('message' => sprintf(__('Form mapping #%d: choose a list to add contacts to.', 'mailercloud'), $label_num)), 400);
             }
         }
 
-        update_option('mailercloud_connector_map_' . $slug, array(
+        return array(
+            'id'      => ($feed_id !== '' ? $feed_id : uniqid('f')),
             'enabled' => $enabled,
+            'form_id' => $form_id,
             'list_id' => $list_id,
             'mapping' => $mapping,
-        ), false);
+        );
+    }
 
+    /**
+     * AJAX: save a connector's mapping. Per-feed when 'feed' is posted (merge by id —
+     * validates only that feed), or all feeds when 'feeds' is posted. Nonce + cap guarded.
+     */
+    public function mailercloud_save_connector_map()
+    {
+        check_ajax_referer('mailercloud_admin_ajax', '_ajax_nonce');
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'forbidden'), 403);
+        }
+        $allowed_slugs = array('cf7', 'wpforms', 'elementor', 'gravity', 'ninja', 'formidable');
+        $slug = isset($_POST['slug']) ? sanitize_key(wp_unslash($_POST['slug'])) : '';
+        if (! in_array($slug, $allowed_slugs, true)) {
+            wp_send_json_error(array('message' => 'invalid connector'), 400);
+        }
+        $connector = $this->mailercloud_connector_by_slug($slug);
+        $existing  = $connector ? $connector->get_feeds() : array();
+
+        // Per-feed save: merge this one feed into the existing list (replace by id, else append).
+        if (isset($_POST['feed']) && is_array($_POST['feed'])) {
+            $feed   = $this->mailercloud_build_feed(wp_unslash($_POST['feed']), 1);
+            $merged = array();
+            $found  = false;
+            foreach ($existing as $f) {
+                if ((string) (isset($f['id']) ? $f['id'] : '') === (string) $feed['id']) {
+                    $merged[] = $feed;
+                    $found = true;
+                } else {
+                    $merged[] = $f;
+                }
+            }
+            if (! $found) {
+                $merged[] = $feed;
+            }
+            update_option('mailercloud_connector_map_' . $slug, array('feeds' => $merged), false);
+            wp_send_json_success(array('message' => 'saved', 'feed_id' => $feed['id']));
+        }
+
+        // Bulk save: replace all feeds.
+        $raw_feeds = isset($_POST['feeds']) && is_array($_POST['feeds']) ? wp_unslash($_POST['feeds']) : array();
+        $feeds = array();
+        $i = 0;
+        foreach ($raw_feeds as $rf) {
+            $i++;
+            $feeds[] = $this->mailercloud_build_feed($rf, $i);
+        }
+        update_option('mailercloud_connector_map_' . $slug, array('feeds' => $feeds), false);
         wp_send_json_success(array('message' => 'saved'));
+    }
+
+    /**
+     * AJAX: delete one feed (form-mapping) from a connector by its id. Nonce + cap guarded.
+     */
+    public function mailercloud_delete_connector_feed()
+    {
+        check_ajax_referer('mailercloud_admin_ajax', '_ajax_nonce');
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'forbidden'), 403);
+        }
+        $allowed_slugs = array('cf7', 'wpforms', 'elementor', 'gravity', 'ninja', 'formidable');
+        $slug    = isset($_POST['slug']) ? sanitize_key(wp_unslash($_POST['slug'])) : '';
+        $feed_id = isset($_POST['feed_id']) ? substr(sanitize_text_field(wp_unslash($_POST['feed_id'])), 0, 40) : '';
+        if (! in_array($slug, $allowed_slugs, true) || $feed_id === '') {
+            wp_send_json_error(array('message' => 'invalid request'), 400);
+        }
+        $connector = $this->mailercloud_connector_by_slug($slug);
+        $remaining = array();
+        foreach (($connector ? $connector->get_feeds() : array()) as $f) {
+            if ((string) (isset($f['id']) ? $f['id'] : '') !== (string) $feed_id) {
+                $remaining[] = $f;
+            }
+        }
+        update_option('mailercloud_connector_map_' . $slug, array('feeds' => $remaining), false);
+        wp_send_json_success(array('message' => 'deleted'));
+    }
+
+    /**
+     * AJAX: return a form's fields for the mapping dropdowns.
+     * Returns { fields: [ { key, label }, ... ] }.
+     */
+    public function mailercloud_get_form_fields()
+    {
+        check_ajax_referer('mailercloud_admin_ajax', '_ajax_nonce');
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error(array('fields' => array()), 403);
+        }
+        $allowed_slugs = array('cf7', 'wpforms', 'elementor', 'gravity', 'ninja', 'formidable');
+        $slug    = isset($_POST['slug']) ? sanitize_key(wp_unslash($_POST['slug'])) : '';
+        $form_id = isset($_POST['form_id']) ? substr(sanitize_text_field(wp_unslash($_POST['form_id'])), 0, 64) : '';
+        if (! in_array($slug, $allowed_slugs, true) || $form_id === '') {
+            wp_send_json_error(array('fields' => array()), 400);
+        }
+        $loader = new Mc_Connectors_Loader();
+        $fields = array();
+        foreach ($loader->all() as $c) {
+            if ($c->slug() === $slug && $c->is_active()) {
+                $fields = $c->get_form_fields($form_id);
+                break;
+            }
+        }
+        wp_send_json(array('fields' => array_values($fields)));
     }
 
     /**

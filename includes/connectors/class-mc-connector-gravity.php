@@ -38,7 +38,49 @@ class Mc_Connector_Gravity extends Mc_Connector_Base
 
     public function on_submit()
     {
-        $this->capture($this->flatten_submission(func_get_args()));
+        $this->handle(func_get_args());
+    }
+
+    public function get_forms()
+    {
+        $out = array();
+        if (! class_exists('GFAPI')) {
+            return $out;
+        }
+        foreach (GFAPI::get_forms() as $f) {
+            $out[] = array('id' => (string) $f['id'], 'title' => isset($f['title']) ? $f['title'] : ('Form ' . $f['id']));
+        }
+        return $out;
+    }
+
+    public function get_form_fields($form_id)
+    {
+        $out = array();
+        if (! class_exists('GFAPI')) {
+            return $out;
+        }
+        $form = GFAPI::get_form((int) $form_id);
+        if (! $form || empty($form['fields'])) {
+            return $out;
+        }
+        foreach ($form['fields'] as $field) {
+            $type = isset($field->type) ? $field->type : '';
+            if (in_array($type, array('html', 'section', 'page', 'captcha', 'submit'), true)) {
+                continue;
+            }
+            $id    = isset($field->id) ? (string) $field->id : '';
+            $label = isset($field->label) ? $field->label : ('Field ' . $id);
+            if ($id !== '') {
+                $out[] = array('key' => $id, 'label' => $label);
+            }
+        }
+        return $out;
+    }
+
+    public function get_form_id($args)
+    {
+        // gform_after_submission: ($entry, $form)
+        return isset($args[1]['id']) ? (string) $args[1]['id'] : '';
     }
 
     public function flatten_submission($args)

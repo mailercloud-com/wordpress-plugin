@@ -38,7 +38,9 @@ class Mc_Connector_Elementor extends Mc_Connector_Base
 
     public function on_submit()
     {
-        $this->capture($this->flatten_submission(func_get_args()));
+        // Elementor has no central form registry, so get_forms() is empty and the UI
+        // keeps free-text/label mapping; handle() therefore won't form-gate (no form_id).
+        $this->handle(func_get_args());
     }
 
     public function flatten_submission($args)
@@ -53,8 +55,14 @@ class Mc_Connector_Elementor extends Mc_Connector_Base
         }
         $out = array();
         foreach ($fields as $id => $field) {
-            if (is_array($field) && isset($field['value']) && $field['value'] !== '') {
-                $out[(string) $id] = $field['value'];
+            if (! is_array($field) || ! isset($field['value']) || $field['value'] === '') {
+                continue;
+            }
+            // Map by Elementor field id (custom_id) AND by the field's label (title), so
+            // admins can use whichever they see. (Duplicate labels: last wins; use the id.)
+            $out[(string) $id] = $field['value'];
+            if (isset($field['title']) && $field['title'] !== '') {
+                $out[$field['title']] = $field['value'];
             }
         }
         return $out;

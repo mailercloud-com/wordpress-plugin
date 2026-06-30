@@ -5,7 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 ?>
 <div class="mailercloud-wrap subs-p">
-    <h1 class="header_sync">Contact Sync</h1>
+    <h1 class="header_sync">Contact Map</h1>
     <form id="mc_api_key_form" class="mc-api-key-form" action="" method="post">
 
         <input type="hidden" name="mc_sync_list_key" value="<?php echo esc_attr($mc_sync_list_key); ?>" />
@@ -206,7 +206,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     <form id="contact_sync_now_form" class="mc_contact_sync_now_form" action="" method="post">
         <?php wp_nonce_field('mailercloud_admin_ajax', '_ajax_nonce'); ?>
         <div id="subscriber_synchronisation_settings_page">
-            <h2>Contact Sync</h2>
+            <h2>Contact Map</h2>
             <label>You have <b><?php echo  esc_html($user_count);?></b> existing users.
                 do you want to add to mailercloud? </label>
             <input name="contact_sync_now" class="button" type="submit" value="sync my users">
