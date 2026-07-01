@@ -5,7 +5,7 @@ Donate link:
 Requires at least: 4.0
 Tested up to: 7.0
 Requires PHP: 7.2.5
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -106,6 +106,9 @@ Since 2018 [Mailercloud](https://www.mailercloud.com/) has been a leading email 
 7. Mailercloud widget
 
 == Changelog ==
+= 1.1.1 =
+Improvement: When a form submission cannot be delivered to Mailercloud (API unreachable or rejected), the plugin now raises a rate-limited alert to the Mailercloud team so connection issues can be spotted and resolved faster. The alert is throttled (at most once per hour per error) and sent in the background, so it never slows down your forms. No submitted contact data is included.
+
 = 1.1.0 =
 New: Form-plugin connectors. Send submissions from Contact Form 7, WPForms, Elementor Forms, Gravity Forms, Ninja Forms and Formidable directly to a Mailercloud list, with per-field mapping and optional tags — visitors are captured even without a WordPress account. Adds an Integrations page to configure connectors and an Analytics page showing leads captured by source.
 
@@ -152,5 +155,8 @@ Mailercloud provides consent and opt-out tools to help you manage compliance for
 
 
 == Upgrade Notice ==
+= 1.1.1 =
+Adds background, rate-limited alerting so the Mailercloud team is notified if your forms hit a delivery problem. No form data is sent.
+
 = 1.1.0 =
 Adds connectors for Contact Form 7, WPForms, Elementor, Gravity, Ninja and Formidable, plus non-user lead capture and field mapping into Mailercloud.

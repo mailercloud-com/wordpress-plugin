@@ -89,7 +89,7 @@ class Mc_Contact_Sync
      * @param string $mode    'upsert' (default) | 'create' | 'update'.
      * @return array { ok: bool, response: array } — ok true when MailerCloud accepted it.
      */
-    public static function send($contact, $list_id, $api_key, $mode = 'upsert')
+    public static function send($contact, $list_id, $api_key, $mode = 'upsert', $source = '')
     {
         if (empty($contact['email']) || empty($api_key)) {
             return array('ok' => false, 'response' => array('message' => 'missing email or api key'));
@@ -102,7 +102,8 @@ class Mc_Contact_Sync
                 'PUT',
                 MAILERCLOUD_SUBSCRIBER_SYNC_SINGLE_CONTACT_UPDATE_API_URL . rawurlencode($email),
                 $api_key,
-                json_encode($contact)
+                json_encode($contact),
+                $source
             );
         } else {
             if (! empty($list_id)) {
@@ -111,7 +112,7 @@ class Mc_Contact_Sync
             $url = ($mode === 'create')
                 ? MAILERCLOUD_SUBSCRIBER_SYNC_SINGLE_CONTACT_API_URL
                 : MAILERCLOUD_UPSERT_CONTACT_API_URL;
-            $response = callWpRemoteRestApi('POST', $url, $api_key, json_encode($contact));
+            $response = callWpRemoteRestApi('POST', $url, $api_key, json_encode($contact), $source);
         }
 
         $ok = is_array($response) && isset($response['status']) && intval($response['status']) === 1;

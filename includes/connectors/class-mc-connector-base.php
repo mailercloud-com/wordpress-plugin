@@ -196,7 +196,9 @@ abstract class Mc_Connector_Base
             return;
         }
 
-        $result = Mc_Contact_Sync::send($contact, $feed['list_id'], $api_key, 'upsert');
+        // Pass the connector label so a delivery failure alert names the integration
+        // (e.g. "Ninja Forms — Mailercloud API rejected request").
+        $result = Mc_Contact_Sync::send($contact, $feed['list_id'], $api_key, 'upsert', $this->label());
 
         if (class_exists('Mc_Analytics')) {
             Mc_Analytics::record($this->slug(), ! empty($result['ok']));

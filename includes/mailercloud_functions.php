@@ -45,6 +45,69 @@
     }
 
     /**
+     * Report a client-facing plugin failure to Mailercloud by reusing the /v1/ticket
+     * endpoint (which raises the server-side team Slack alert). This deliberately does NOT
+     * repeat the mistake that got the old per-error ticket calls removed:
+     *   - Rate-limited: at most one report per distinct error per hour, per site
+     *     (WP transient throttle) — so 100+ installs can't storm the API during an incident.
+     *   - Non-blocking: fire-and-forget (blocking=false, short timeout) so it never delays
+     *     the visitor's request or adds a second blocking call on the hot path.
+     *   - No PII: the ticket carries only the endpoint, the API error detail, and
+     *     site/WP/PHP context — never the submitted contact data. The API key travels in the
+     *     Authorization header (as the API requires) and is never placed in the body.
+     *
+     * @param string $context  Short label, e.g. "contact upsert failed".
+     * @param string $url       The Mailercloud endpoint that failed.
+     * @param mixed  $detail    Error message / response body.
+     * @param string $api_key   The site's Mailercloud API key (auth for the ticket).
+     * @return void
+     */
+    function mc_report_error($context, $url, $detail, $api_key)
+    {
+        if (empty($api_key)) {
+            return; // cannot authenticate the ticket without the site's API key
+        }
+        // Strip CR/LF first, then cap length (so a boundary newline can't survive the cut).
+        $detail = substr(str_replace(array("\r", "\n"), ' ', (string) $detail), 0, 300);
+        // Defense-in-depth: never let subscriber PII into a team ticket. Redact any email in
+        // the detail, and strip per-contact path segments from the endpoint
+        // (update mode builds /v1/contacts/<email>).
+        $detail = preg_replace('/[^\s@"]+@[^\s@"]+\.[^\s@"]+/', '<redacted-email>', $detail);
+        // Redact only an email-bearing path segment (raw or %40-encoded) — keep legitimate
+        // endpoint words like /v1/contacts/upsert intact.
+        $url = preg_replace('#(/v1/contacts/)[^/?]*(?:@|%40)[^/?]*#i', '${1}<redacted>', (string) $url);
+        // Throttle on a signature of the error so repeats within the hour are suppressed.
+        $sig = 'mc_err_' . md5($context . '|' . $url . '|' . $detail);
+        if (get_transient($sig)) {
+            return;
+        }
+        set_transient($sig, 1, HOUR_IN_SECONDS);
+
+        $description = wp_json_encode(array(
+            'context'  => $context,
+            'endpoint' => $url,
+            'detail'   => $detail,
+            'site'     => home_url(),
+            'wp'       => get_bloginfo('version'),
+            'php'      => PHP_VERSION,
+        ));
+        wp_remote_post(MAILERCLOUD_TICKET_CREATION_API_URL, array(
+            'body'        => wp_json_encode(array(
+                'title'       => 'WP plugin error: ' . $context,
+                'description' => $description,
+                'status'      => 500,
+            )),
+            'headers'     => array(
+                'Content-Type'  => 'application/json',
+                'Authorization' => $api_key,
+            ),
+            'data_format' => 'body',
+            'timeout'     => 2,
+            'blocking'    => false, // fire-and-forget — never block the request or amplify load
+        ));
+    }
+
+    /**
      * callWpRemoteRestApi
      *
      * @param  mixed $method
@@ -53,7 +116,7 @@
      * @param  mixed $body
      * @return array  { status:0|1, message, and one of data|id|errors }
      */
-    function callWpRemoteRestApi($method, $url, $api_key, $body = false)
+    function callWpRemoteRestApi($method, $url, $api_key, $body = false, $source = '')
     {
         $message = '';
         $status = 0;
@@ -101,6 +164,7 @@
             // that fired a second blocking call per failure and amplified load during
             // incidents; team alerting is handled server-side on the Mailercloud API.
             mc_log_api_error($method, $url, $body, $response);
+            mc_report_error(($source !== '' ? $source . ' — ' : '') . 'Mailercloud API unreachable', $url, $response->get_error_message(), $api_key);
             return [
                 'message' => __('Could not reach Mailercloud. Please try again.', 'mailercloud'),
                 'status'  => 0,
@@ -128,8 +192,9 @@
                     return $response;
                 } elseif (isset($bodyData['errors'])) {
                     // API rejected the request. Return the errors to the caller (so the admin
-                    // UI can show them) and log the trace. No /v1/ticket call (removed).
+                    // UI can show them), log the trace, and raise a rate-limited team alert.
                     mc_log_api_error($method, $url, $body, $response);
+                    mc_report_error(($source !== '' ? $source . ' — ' : '') . 'Mailercloud API rejected request', $url, wp_json_encode($bodyData['errors']), $api_key);
                     return [
                         'message' => __('Mailercloud returned an error.', 'mailercloud'),
                         'status'  => 0,

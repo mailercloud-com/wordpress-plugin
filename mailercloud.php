@@ -7,7 +7,7 @@
  * Author URI:      https://mailercloud.com/
  * Text Domain:     mailercloud
  * Domain Path:     /languages
- * Version:         1.1.0
+ * Version:         1.1.1
  *
  * @package         Mailercloud
  */
@@ -23,7 +23,7 @@ class Mailercloud
      * @since 0.1.0
      * @var
      */
-    public $version = '1.1.0';
+    public $version = '1.1.1';
     /* Member variables */
     public $mailercloud_api_key;
     public $default_mapping_array= [];
